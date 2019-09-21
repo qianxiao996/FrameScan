@@ -166,7 +166,9 @@ if __name__ == "__main__":
 
 ## 鸣谢
 
-POC多数来源于AngelSword:https://github.com/Sch01ar/AngelSword，部分为自己编写，欢迎投递POC
+POC多数来源于
+AngelSword:https://github.com/Sch01ar/AngelSword
+部分为自己编写，欢迎投递POC
 
 邮箱地址：qianxiao996@126.com
 
