@@ -56,7 +56,7 @@ import sqlite3,requests
 运行脚本
 
 ```
->python3 webcrack.py
+>python3 FrameScan.py
      _____                         ____
     |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __
     | |_ | '__/ _` | '_ ` _ \ / _ \___ \ / __/ _` | '_ \
