@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # FrameScan
 
 ## 工具简介
