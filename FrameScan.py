@@ -113,11 +113,11 @@ def Reload_POC():
         sys.exit(1)
     printBlue("[*]Info:正在写入数据...")
     try:
-        cms_path=sys.path[0]+ "\cms"
+        cms_path=sys.path[0]+ "\Plugins"
         cms_path = cms_path.replace("\\","/")
 
         #创建一个文件来存储引入的模块
-        cmsmain_file = open(cms_path+"/cmsmain.py","w",encoding="utf-8")
+        cmsmain_file = open(cms_path+"/Plugins.py","w",encoding="utf-8")
     except:
         printRed("[E]Error:打开cmsmain.py文件失败！")
         sys.exit(1)
@@ -181,7 +181,7 @@ def Reload_POC():
                                 if poc_name !="" and poc_methos!="":
                                 #将数据插入到表中
                                     cursor.execute('insert into POC (cmsname, pocname,pocmethods,pocreferer,pocdescription) values ("%s","%s","%s","%s","%s")'%(cms_name,poc_name,poc_methos,poc_referer,poc_description))
-                                    data = "from cms." +cms_name+"."+ poc_file_name.replace(".py","")+ " import " + poc_methos+"\n"
+                                    data = "from Plugins." +cms_name+"."+ poc_file_name.replace(".py","")+ " import " + poc_methos+"\n"
                                     cmsmain_file.write(data)
                             f.close()
                         else:
@@ -309,10 +309,18 @@ def check_url_go(url,data):
         #使用eval方法将字符串转换为可以执行的函数
         try:
             printBlue("[*]Info:扫描%s"%methods[1]+"...")
-            eval(methods[0])(url).run()
+            return_data = eval(methods[0])(url).run()
+            # print (return_data)
+            if return_data[2] == '存在' and return_data[2] != '' :
+                printGreen("[*]Info:%s----%s----%s\n[*]Payload:%s。" % (url, return_data[0], return_data[2],return_data[1]))
+            if return_data[2] == '错误' and return_data[2] != '' :
+                printRed(
+                    "[*]Error:%s----%s----%s扫描出现错误。" % (url, return_data[0], return_data[2]))
+            else:
+                printBlue("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
         except:
             printRed("[E]Error:%s脚本执行错误！"%methods[0])
-    #     # methods(url)
+        # methods(url)
     printBlue("[-]End:扫描结束！")
 def check_file_go(url_list,data):
     printBlue(FLAGLET)
@@ -326,12 +334,21 @@ def check_file_go(url_list,data):
             #使用eval方法将字符串转换为可以执行的函数
             try:
                 printBlue("[*]Info:扫描%s"%methods[1]+"...")
-                eval(methods[0])(url).run()
+                return_data = eval(methods[0])(url).run()
+                # print (return_data)
+                if return_data[2] == '存在' and return_data[2] != '':
+                    printGreen("[*]Info:%s----%s----%s\n[*]Payload:%s。" % (
+                    url, return_data[0], return_data[2], return_data[1]))
+                if return_data[2] == '错误' and return_data[2] != '':
+                    printRed(
+                        "[*]Error:%s----%s----%s扫描出现错误。" % (url, return_data[0], return_data[2]))
+                else:
+                    printBlue("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
             except:
                 printRed("[E]Error:%s脚本执行错误！"%methods[0])
         # printBlue("\n")
     #     # methods(url)
-    printBlue("[-]End:扫描结束！")
+    printYellow("[-]End:扫描结束！")
 def Judgement_parameter(Command_dict):
     sql_data=""
     if "URL" in Command_dict and 'file' not in Command_dict:
@@ -405,7 +422,7 @@ if __name__ == '__main__':
         printRed("[E]Error:数据库文件不存在，请执行-r重新加载数据文件！")
         sys.exit(1)
     try:
-        from cms.cmsmain import *
+        from Plugins.Plugins import *
     except:
         printBlue(FLAGLET)
         printRed("[E]Error:CMS数据库文件引入错误，请执行-r重新加载数据文件！")
