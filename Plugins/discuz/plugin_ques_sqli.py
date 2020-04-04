@@ -18,7 +18,7 @@ class plugin_ques_sqli:
         self.url = url
 
     def run(self):
-        result = ['cmseasy header.php 报错注入', '', '']
+        result = ['discuz问卷调查参数orderby注入漏洞', '', '']
         headers = {
             "User-Agent":"Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50"
         }
@@ -33,7 +33,7 @@ class plugin_ques_sqli:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
         return result
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")

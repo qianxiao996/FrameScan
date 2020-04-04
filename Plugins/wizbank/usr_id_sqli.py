@@ -33,7 +33,7 @@ class usr_id_sqli:
                 reqlst.append(str(req.text))
 
             except:
-                result[2]='未知'
+                result[2]='不存在'
                 return result
 
         if r"true" in reqlst[0] and r"false" in reqlst[1]:

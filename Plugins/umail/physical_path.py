@@ -45,7 +45,7 @@ class physical_path:
             else:
                 result[2]='不存在'
         except:
-            result[2] = '未知'
+            result[2] = '不存在'
         return result
 
 

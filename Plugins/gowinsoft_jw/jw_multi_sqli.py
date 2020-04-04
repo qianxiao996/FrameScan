@@ -40,7 +40,7 @@ class jw_multi_sqli:
             if noexist:
                 result[2]=  '不存在'
         except:
-            result[2]='未知'
+            result[2]='不存在'
         return result
 
 if __name__ == "__main__":

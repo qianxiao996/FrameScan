@@ -6,12 +6,14 @@
 #别问我为什么不用命令行解释模块，因为丑。
 import sys,os,re
 from color import *
-import sqlite3,requests
-
+import sqlite3,requests,threading
+import queue,frozen_dir
+SETUP_DIR = frozen_dir.app_path()
+sys.path.append(SETUP_DIR)
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "POC_DB.db"  #存储的数据库名
-VERSION = "V1.1"
+VERSION = "V1.2 20200404"
 FLAGLET = ("""
      _____                         ____                  
     |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -21,7 +23,7 @@ FLAGLET = ("""
 """)
 usage = FLAGLET + '''
     Options:                          Code by qianxiao996 
-    -----------------------------------------------------
+    ---------------------------------------------------------
     -u          Url                      URL地址
     -f          Load urls file           文件路径
     -m          Use poc module           使用单个POC
@@ -30,11 +32,12 @@ usage = FLAGLET + '''
     -lc         List CMS POC             列出指定CMS漏洞
     -l          List avalible pocs       列出所有POC
     -r          Reload POC               重新加载POC
+    -t          Threads                  指定线程数量，默认10
     -txt        Save Result(txt)         输出扫描结果（txt）
-    -html       Save Result(html)        输出扫描结果（txt）
+    -html       Save Result(html)        输出扫描结果（html）
     -h          Get help                 帮助信息
-    -----------------------------------------------------
-    FrameScan  %s              Blog:blog.qianxiao996.cn
+    ---------------------------------------------------------
+    FrameScan  %s         Blog:blog.qianxiao996.cn
     ''' % VERSION
 #得到输入的参数
 def getparameter():
@@ -44,6 +47,8 @@ def getparameter():
     for i in range(1, len(Command)):
         # 指定爆破的URL
         try:
+            if Command[i] == "-t":
+                Command_dict['t'] = Command[i + 1]
             if Command[i] == "-u":
                 if Command[i + 1][0:7] != 'http://' and Command[i + 1][0:8] != "https://":
                     printBlue(FLAGLET)
@@ -67,6 +72,7 @@ def getparameter():
                     Command_dict['txt'] = Command[i + 1]
                 if Command[i] == "-html":
                     Command_dict['html'] = Command[i + 1]
+
         except:
             printBlue(FLAGLET)
             printRed("[E]Error:参数值设置错误！")
@@ -120,11 +126,11 @@ def Reload_POC():
         sys.exit(1)
     printBlue("[*]Info:正在写入数据...")
     try:
-        cms_path=sys.path[0]+ "\Plugins"
-        cms_path = cms_path.replace("\\","/")
+        # print(SETUP_DIR)
+        cms_path='Plugins/'
 
         #创建一个文件来存储引入的模块
-        cmsmain_file = open(cms_path+"/Plugins.py","w",encoding="utf-8")
+        cmsmain_file = open("Plugins/Plugins.py","w",encoding="utf-8")
     except:
         printRed("[E]Error:打开cmsmain.py文件失败！")
         sys.exit(1)
@@ -307,10 +313,15 @@ def check_sql(sql):
     cursor.execute(sql)
     values = cursor.fetchall()
     return values
-def check_url_go(url,data,save_file):
+
+def check_vuln(url_list,poc_list,save_file,threadnum):
+    # print(save_file,threadnum)
+    # print(save_file)
+    threads = []
+    portQueue = queue.Queue()  # 待检测端口队列，会在《Python常用操作》一文中更新用法
     if save_file!="":
-        file_type = save_file.split('$$')[0]
-        file_name = save_file.split('$$')[1]
+        file_type = save_file.split('$$$')[0]
+        file_name = save_file.split('$$$')[1]
         # printYellow(file_type)
         # printYellow(file_name)
         if file_type == 'html':
@@ -324,156 +335,110 @@ def check_url_go(url,data,save_file):
                         <th>URL</th>
                         <th>Result</th>
                         <th>Vuln_Name</th>
-                        <th>Payload</th>
                         <th>POC_Methods</th>
-                        </tr>''')
-            save.close()
-
-    printBlue(FLAGLET)
-    printBlue("[-]Start:开始执行")
-    printBlue("[*]Info:共加载%s个漏洞" % len(data))
-    printBlue("[*]Info:开始扫描...")
-    for methods in data:
-        #使用eval方法将字符串转换为可以执行的函数
-        try:
-            printBlue("[*]Info:扫描%s"%methods[1]+"...")
-            return_data = eval(methods[0])(url).run()
-            # print (return_data)
-            if return_data[2] == '存在' and return_data[2] != '' :
-                printGreen("[*]Info:%s----%s----%s\n[*]Payload:%s。" % (url, return_data[0], return_data[2],return_data[1]))
-            if return_data[2] == '错误' and return_data[2] != '' :
-                printRed(
-                    "[*]Error:%s----%s----%s扫描出现错误。" % (url, return_data[0], return_data[2]))
-            else:
-                printBlue("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
-            if file_type == 'txt' and return_data[2] != '不存在' :
-                save = open(file_name, 'a', encoding='utf-8')
-                save.write(
-                    "%s----%s----%s----Payload:%s。\n" % (url, return_data[0], return_data[2], return_data[1]))
-                save.close()
-            if file_type == 'html' and return_data[2] != '不存在' :
-                save = open(file_name, 'a', encoding='gbk')
-                save.write('''  <tr>
-                                <td>%s</td>
-                                <td>%s</td>
-                                <td>%s</td>
-                                <td>%s</td>
-                                <td>%s</td>
-                                </tr>\n'''% (url, return_data[2], return_data[0], return_data[1],methods[0]))
-                save.close()
-
-        except:
-            printRed("[E]Error:%s脚本执行错误！"%methods[0])
-        # methods(url)
-
-    printBlue("[-]End:扫描结束！")
-def check_file_go(url_list,data,save_file):
-    if save_file!="":
-        file_type = save_file.split('$$')[0]
-        file_name = save_file.split('$$')[1]
-        # printYellow(file_type)
-        # printYellow(file_name)
-        if file_type == 'html':
-            save = open(file_name, 'a', encoding='gbk')
-            save.write('''
-                        <html>
-                        <body>
-                        <h1 align="center">FrameScan Sacn Result</h1>
-                        <table border = "1"  align="center">
-                        <tr>
-                        <th>URL</th>
-                        <th>Result</th>
-                        <th>Vuln_Name</th>
                         <th>Payload</th>
-                        <th>POC_Methods</th>
                         </tr>''')
             save.close()
     printBlue(FLAGLET)
     printBlue("[-]Start:开始执行")
     printBlue("[*]Info:共加载%s个URL"%len(url_list))
-    printBlue("[*]Info:共加载%s种漏洞" % len(data))
+    printBlue("[*]Info:共加载%s种漏洞" % len(poc_list))
+    printYellow("[-]Start:开始扫描...")
+    printGreen(
+        "----------------------------------------------------------------------------------------")
     for url in url_list:
-        url = url.replace("\n","").replace("\r\n","").replace("\r","")
-        printSkyBlue("[*]Info:开始扫描%s"%url)
-        for methods in data:
-            #使用eval方法将字符串转换为可以执行的函数
-            try:
-                printBlue("[*]Info:扫描%s"%methods[1]+"...")
-                return_data = eval(methods[0])(url).run()
-                # print (return_data)
-                if return_data[2] == '存在' and return_data[2] != '':
-                    printGreen("[*]Info:%s----%s----%s\n[*]Payload:%s。" % (
-                    url, return_data[0], return_data[2], return_data[1]))
-                if return_data[2] == '错误' and return_data[2] != '':
-                    printRed(
-                        "[*]Error:%s----%s----%s扫描出现错误。" % (url, return_data[0], return_data[2]))
-                else:
-                    printBlue("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
-                if file_type == 'txt' and return_data[2] != '不存在':
-                    save = open(file_name, 'a', encoding='utf-8')
-                    save.write(
-                        "%s----%s----%s----Payload:%s。\n" % (url, return_data[0], return_data[2], return_data[1]))
-                    save.close()
-                if file_type == 'html' and return_data[2] != '不存在':
-                    save = open(file_name, 'a', encoding='gbk')
-                    save.write('''  <tr>
-                                        <td>%s</td>
-                                        <td>%s</td>
-                                        <td>%s</td>
-                                        <td>%s</td>
-                                        <td>%s</td>
-                                        </tr>\n''' % (url, return_data[2], return_data[0], return_data[1], methods[0]))
-                    save.close()
-            except:
-                printRed("[E]Error:%s脚本执行错误！"%methods[0])
-        # printBlue("\n")
-    #     # methods(url)
-    save.close()
+        for methods in poc_list:
+            portQueue.put(url+ '$$$' + methods[0]+ '$$$' + methods[1]+'$$$'+save_file)
+            # print(url,methods[0])
+    if threadnum>portQueue.qsize():
+        threadnum = portQueue.qsize()
+    for i in range(threadnum):
+        thread = threading.Thread(target=vuln_start, args=(portQueue,save_file))
+        # thread.setDaemon(True)  # 设置为后台线程，这里默认是False，设置为True之后则主线程不用等待子线程
+        threads.append(thread)
+        thread.start()
+    for t in threads:
+        t.join()
+    printGreen(
+            "----------------------------------------------------------------------------------------")
     printYellow("[-]End:扫描结束！")
-def Judgement_parameter(Command_dict):
-    sql_data=""
-    if "URL" in Command_dict and 'file' not in Command_dict:
-        if "txt" in Command_dict and "html" in Command_dict:
-            printBlue(FLAGLET)
-            printRed("[E]Error:-txt参数和-html参数不能同时使用！")
-            sys.exit(1)
-        if "CMS" in Command_dict and "module" in Command_dict:
-            printBlue(FLAGLET)
-            printRed("[E]Error:-m参数和-c参数不能同时使用！")
-            sys.exit(1)
+    sys.exit(1)
+def vuln_start(portQueue,save_file):
+    while 1:
+        if portQueue.empty():  # 队列空就结束
+            break
+        all = portQueue.get()  # 从队列中取出
+        url = all.split('$$$')[0]
+        methods = all.split('$$$')[1]
+        methods_name = all.split('$$$')[2]
+        if save_file!="":
+            file_type= save_file.split('$$$')[0]
+            file_name =save_file.split('$$$')[1]
         else:
-            if "module" in Command_dict and "CMS" not in Command_dict:
-                # -m -u
-                sql_data = "select pocmethods,pocname from POC where pocmethods='%s'" % Command_dict['module']
-            if "CMS" in Command_dict and "module" not in Command_dict:
-                # -c  -u
-                sql_data = "select pocmethods,pocname from POC where cmsname='%s'" % Command_dict['CMS']
-            # printYellow(str(len(Command_dict)))
-            if "txt" in Command_dict or "html" in Command_dict or len(sys.argv)==3:
-                # -u参数
-                sql_data = "select pocmethods,pocname from POC"
-
-            if sql_data!="":
-                data = check_sql(sql_data)
-                # print(data)
-                # print(type(data))
-                if "txt" in Command_dict:
-                    check_url_go(Command_dict['URL'], data,"txt$$"+Command_dict['txt'])
-                if "html" in Command_dict:
-                    check_url_go(Command_dict['URL'], data,"html$$"+Command_dict['html'])
-                else:
-                    check_url_go(Command_dict['URL'], data, "")
-                sys.exit(1)
+            file_type=''
+        #使用eval方法将字符串转换为可以执行的函数
+        try:
+            return_data = eval(methods)(url).run()
+            # print (return_data)
+            if return_data[2] == '存在' and return_data[2] != '':
+                printGreen("[*] %s----%s----%s\n[*]Payload:%s。" % (
+                url, return_data[0], return_data[2], return_data[1]))
+            elif return_data[2] == '错误' and return_data[2] != '':
+                printRed(
+                    "[*]Error:%s----%s----%s扫描出现错误。" % (url, return_data[0], return_data[2]))
+            elif return_data[2] == '不存在' and return_data[2] != '':
+                printBlue("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
             else:
+                printPink("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
+            if file_type == 'txt' and return_data[2] != '不存在':
+                save = open(file_name, 'a', encoding='utf-8')
+                save.write(
+                    "%s----%s----%s----Payload:%s。\n" % (url, return_data[0], return_data[2], return_data[1]))
+                save.close()
+            if file_type == 'html' and return_data[2] != '不存在':
+                save = open(file_name, 'a', encoding='gbk')
+                save.write('''  <tr>
+                                    <td>%s</td>
+                                    <td>%s</td>
+                                    <td>%s</td>
+                                    <td>%s</td>
+                                    <td>%s</td>
+                                    </tr>\n''' % (url, return_data[2], return_data[0], methods,return_data[1] ))
+                save.close()
+        except Exception as e:
+            printRed("[E]Error:%s脚本执行错误！方法名：%s"%(methods_name,methods))
+            printRed("[E]Error:%s"%e)
+    # printYellow("[-]End:扫描结束！")
+def get_url_list(path):
+    all_list =[]
+    if os.path.exists(path):
+        try:
+            file = open(path,'r',encoding= 'utf-8')
+            for line in file:
+                if 'http://' in line or 'https://' in line:
+                    all_list.append(line)
+            file.close()
+            all_list2 = []
+            for i in all_list:
+                if i not in all_list2:
+                    all_list2.append(i.replace('\n','').strip())
+            return list(filter(None, all_list2))  # 去除 none 和 空字符
+        except:
+            printRed('Error:文件读取错误！')
+    else:
+        all_list = path.split()
+        return list(filter(None, all_list))  # 去除 none 和 空字符
+def Judgement_parameter(Command_dict):
+    if ("URL" in Command_dict and 'file' not in Command_dict)or ('file' in Command_dict and "URL" not in Command_dict):
+        if "URL" in Command_dict:
+            url_list = get_url_list(Command_dict['URL'])
+        elif 'file' in Command_dict:
+            if not os.path.isfile(Command_dict['file']):
                 printBlue(FLAGLET)
-                printRed("[E]Error:参数设置错误！")
+                printRed("[E]Error:文件%s不存在！" % Command_dict['file'])
                 sys.exit(1)
-        # file module  cms
-    if 'file' in Command_dict and "URL" not in Command_dict:
-        if not os.path.isfile(Command_dict['file']):
-            printBlue(FLAGLET)
-            printRed("[E]Error:文件%s不存在！" % Command_dict['file'])
-            sys.exit(1)
+            url_list = get_url_list(Command_dict['file'])
+
         if "txt" in Command_dict and "html" in Command_dict:
             printBlue(FLAGLET)
             printRed("[E]Error:-txt参数和-html参数不能同时使用！")
@@ -483,28 +448,34 @@ def Judgement_parameter(Command_dict):
             printRed("[E]Error:-m参数和-c参数不能同时使用！")
             sys.exit(1)
         else:
+            sql_data = ""
+            if 'threads' in Command_dict:
+                threadnum = int(Command_dict['t'])
+            else:
+                threadnum = 10
             if "module" in Command_dict:
                 sql_data = "select pocmethods,pocname from POC where pocmethods='%s'" % Command_dict['module']
-            if "CMS" in Command_dict:
+            elif "CMS" in Command_dict:
                 sql_data = "select pocmethods,pocname from POC where cmsname='%s'" % Command_dict['CMS']
-            if "txt" in Command_dict or "html" in Command_dict or len(sys.argv) == 3:
+            elif  (('html' in Command_dict) or ('txt' in Command_dict) or ("module" not in Command_dict or "CMS" in Command_dict)):
                 # -u参数
                 sql_data = "select pocmethods,pocname from POC"
             if sql_data != "":
-                data = check_sql(sql_data)
-                # 读取url到列表中
-                file_url = []
-                f = open(Command_dict['file'], 'r', encoding='utf-8')
-                for url in f.readlines():
-                    if url[0:7] == 'http://' or url[0:8] == "https://":
-                        file_url.append(url)
+                poc_list = check_sql(sql_data)
+                if len(poc_list)==0:
+                    printBlue(FLAGLET)
+                    printRed("[E]Error:未查询到POC！")
+                    sys.exit(1)
                 if "txt" in Command_dict:
-                    check_file_go(file_url, data, "txt$$" + Command_dict['txt'])
+                    check_vuln(url_list, poc_list, "txt$$$" + Command_dict['txt'],threadnum)
                 if "html" in Command_dict:
-                    check_file_go(file_url, data, "html$$" + Command_dict['html'])
+                    check_vuln(url_list, poc_list, "html$$$" + Command_dict['html'],threadnum)
+                else:
+                    # print(url_list)
+                    check_vuln(url_list, poc_list, "",threadnum)
+
             else:
                 printBlue(FLAGLET)
-                printRed("[E]Error:参数设置错误！")
                 sys.exit(1)
     else:
         printBlue(usage)

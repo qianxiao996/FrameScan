@@ -37,7 +37,7 @@ class weak_pass:
                     result[1]=vulnurl+"\npost: "+json.dumps(post_data, indent=4)
                     break
             except:
-                result[2] = '未知'
+                result[2] = '不存在'
             return result
 
 if __name__ == "__main__":

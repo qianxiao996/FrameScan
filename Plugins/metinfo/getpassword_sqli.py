@@ -37,7 +37,7 @@ class getpassword_sqli:
                     result[1] = vulnurl
                     return result
             except:
-                result[2]='未知'
+                result[2]='不存在'
                 return result
         result[2]=  '不存在'
         return result

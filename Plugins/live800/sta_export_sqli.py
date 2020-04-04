@@ -51,7 +51,7 @@ class sta_export_sqli:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
             return result
 
         headers={
@@ -84,7 +84,7 @@ class sta_export_sqli:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
             return result
 
         turl = "/live800/sta/export/chatHoursSta.jsp"
@@ -110,7 +110,7 @@ class sta_export_sqli:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
             return result
 
         turl = "/live800/sta/export/chatUrlSta.jsp"
@@ -136,7 +136,7 @@ class sta_export_sqli:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
             return result
         return result
 

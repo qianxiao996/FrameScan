@@ -18,7 +18,7 @@ class x25_path_disclosure:
         self.url = url
 
     def run(self):
-        result = ['cmseasy header.php 报错注入', '', '']
+        result = ['discuz! X2.5 物理路径泄露漏洞', '', '']
         headers = {
             "User-Agent":"Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50"
         }
@@ -37,7 +37,7 @@ class x25_path_disclosure:
             result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
         return result
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")

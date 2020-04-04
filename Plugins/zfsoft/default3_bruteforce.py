@@ -23,15 +23,15 @@ class default3_bruteforce:
         }
         try:
             req = requests.get(self.url, headers=headers, timeout=6, verify=False, allow_redirects=True)
+            tmpurl = str(req.url)
+            tmpurl = tmpurl.lower()
+            if r"default2.aspx" in tmpurl or r"default.aspx" in tmpurl:
+                vulnurl = tmpurl.replace("default2.aspx","").replace("default.aspx", "")
+            else:
+                vulnurl = tmpurl
+            vulnurl = vulnurl + "default3.aspx"
         except:
             pass
-        tmpurl = str(req.url)
-        tmpurl = tmpurl.lower()
-        if r"default2.aspx" in tmpurl or r"default.aspx" in tmpurl:
-            vulnurl = tmpurl.replace("default2.aspx","").replace("default.aspx", "")
-        else:
-            vulnurl = tmpurl
-        vulnurl = vulnurl + "default3.aspx"
         try:
             req = requests.get(vulnurl, headers=headers, timeout=10, verify=False)
             if r"__VIEWSTATEGENERATOR" in req.text and r"CheckCode.aspx" not in req.text and req.status_code ==200:
@@ -41,7 +41,7 @@ class default3_bruteforce:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
         return result
 
 if __name__ == "__main__":

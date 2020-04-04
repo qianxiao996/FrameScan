@@ -27,7 +27,7 @@ class onethink_category_sqli:
                 req = requests.get(vulnurl, timeout=10, verify=False)
                 reqlst.append(str(req.text))
             except:
-                result[2]='未知'
+                result[2]='不存在'
                 return result
         if len(reqlst[0]) != len(reqlst[1]) and r"分类不存在或被禁用" in reqlst[1]: 
             result[2]=  '存在'
@@ -43,7 +43,7 @@ class onethink_category_sqli:
                 reqlst.append(str(req.text))
 
             except:
-                result[2]='未知'
+                result[2]='不存在'
                 return result
         if len(reqlst[0]) != len(reqlst[1]) and r"分类不存在或被禁用" in reqlst[1]: 
             result[2]=  '存在'

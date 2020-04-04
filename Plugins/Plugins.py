@@ -476,8 +476,8 @@ from Plugins.yonyou.multi_union_sqli import multi_union_sqli
 from Plugins.yonyou.nc_NCFindWeb_fileread import nc_NCFindWeb_fileread
 from Plugins.yonyou.status_default_pwd import status_default_pwd
 from Plugins.yonyou.test_sqli import test_sqli
-from Plugins.yonyou.u8_CmxItem_sqli import u8_CmxItem_sqli
 from Plugins.yonyou.user_ids_sqli import user_ids_sqli
+from Plugins.yonyou.yonyou_nc_Unauthorized import yonyou_nc_Unauthorized
 
 #zabbix
 from Plugins.zabbix.jsrpc_profileIdx2_sqli import jsrpc_profileIdx2_sqli_BaseVerify

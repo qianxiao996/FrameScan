@@ -35,7 +35,7 @@ class v655_code_exec:
                 return returnresult
         except Exception as e:
             # print (e)
-            returnresult[2]='未知'
+            returnresult[2]='不存在'
             return returnresult
 
 

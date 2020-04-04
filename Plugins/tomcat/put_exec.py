@@ -39,7 +39,7 @@ class put_exec_BaseVerify:
                 result[2] = '不存在'
 
         except:
-            result[2] = '未知'
+            result[2] = '不存在'
             return result
 
         time_stamp = time.mktime(datetime.datetime.now().timetuple())
@@ -56,7 +56,7 @@ class put_exec_BaseVerify:
                 result[2] = '不存在'
 
         except:
-            result[2] = '未知'
+            result[2] = '不存在'
         return result
 
 if __name__ == "__main__":

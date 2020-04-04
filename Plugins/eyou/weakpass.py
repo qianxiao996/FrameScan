@@ -31,7 +31,7 @@ class weakpass:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
             return result
 
         payload = "/sysinfo.html"
@@ -45,7 +45,7 @@ class weakpass:
                 result[2]=  '不存在'
 
         except:
-            result[2]='未知'
+            result[2]='不存在'
             return result
         return result
 

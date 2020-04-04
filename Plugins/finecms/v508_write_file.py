@@ -34,7 +34,7 @@ class v508_write_file:
             else:
                 returnresult[2]=  '不存在'
         except:
-            returnresult[2]='未知'
+            returnresult[2]='不存在'
         return returnresult
 
 if __name__ == "__main__":

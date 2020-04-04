@@ -66,7 +66,7 @@ class fastcgi_read_BaseVerify:
             else:
                 result[2] = '不存在'
         except:
-            result[2] = '未知'
+            result[2] = '不存在'
         sock.close()
         return result
 
