@@ -106,11 +106,14 @@ def Reload_POC():
     #删除数据库，重新建立
     printBlue("[*]Info:正在删除数据库...")
     try:
-        os.remove(DB_NAME)
+        if os.path.exists(DB_NAME):
+            os.remove(DB_NAME)
+            printGreen("[+]Success:删除数据库完成！")
+        else:
+            printBlue("[*]Info:文件不存在，无需删除！")
     except:
         printRed("[E]Error:数据库文件删除失败，请手动删除！")
         sys.exit(1)
-    printGreen("[+]Success:删除数据库完成！")
     printBlue("[*]Info:正在创建数据库...")
     try:
         # 连接数据库。如果数据库不存在的话，将会自动创建一个 数据库
