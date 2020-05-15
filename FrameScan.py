@@ -4,16 +4,18 @@
 #Blog:blog.qianxiao996.cn
 #date:  2019-9-21
 #别问我为什么不用命令行解释模块，因为丑。
+import importlib
 import sys,os,re
 from color import *
 import sqlite3,requests,threading
 import queue,frozen_dir
 SETUP_DIR = frozen_dir.app_path()
 sys.path.append(SETUP_DIR)
+vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "POC_DB.db"  #存储的数据库名
-VERSION = "V1.2 20200404"
+VERSION = "V1.3 20200515"
 FLAGLET = ("""
      _____                         ____                  
     |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -82,6 +84,7 @@ def getparameter():
             if Command[i] == "-s" or Command[i] == "-lc":
                 if len(sys.argv)==2:
                     printBlue(usage)
+                    sys.exit(1)
                 else:
                     list_cms_poc()
                     sys.exit(1)
@@ -121,34 +124,16 @@ def Reload_POC():
         # 创建一个游标 curson
         cursor = conn.cursor()
         # 执行一条语句,创建 user表 如不存在创建
-        sql = "create table IF NOT EXISTS POC (id integer primary key autoincrement , cmsname varchar(30),pocmethods varchar(40),pocname  varchar(30),pocreferer varchar(50),pocdescription varchar(200))"
+        sql = "create table IF NOT EXISTS POC (id integer primary key autoincrement , cmsname varchar(30),pocfilename varchar(40),pocname  varchar(30),pocreferer varchar(50),pocdescription varchar(200),pocmethods  varchar(40))"
         cursor.execute(sql)
         printGreen("[+]Success:创建数据库完成!")
     except:
         printRed("[E]Error:数据框创建失败！")
         sys.exit(1)
     printBlue("[*]Info:正在写入数据...")
+    cms_path='Plugins/'
     try:
-        # print(SETUP_DIR)
-        cms_path='Plugins/'
-
-        #创建一个文件来存储引入的模块
-        cmsmain_file = open("Plugins/Plugins.py","w",encoding="utf-8")
-    except:
-        printRed("[E]Error:打开cmsmain.py文件失败！")
-        sys.exit(1)
-    try:
-        cmsmain_file.write(r"#!/usr/bin/env python"+'\n'
-                r"# -*- coding: utf-8 -*-"+'\n'
-                r"'''"+'\n'
-                r"name: cms漏洞库"+'\n'
-                r"referer: unknow"+'\n'
-                r"author: qianxiao996"+'\n'
-                r"description: 包含所有cms漏洞类型，封装成一个模块"+'\n'
-                r"此文件禁止修改"+'\n'
-                r"'''"+'\n')
         for cms_name in os.listdir(cms_path): #遍历目录名
-            cmsmain_file.write("#" + cms_name + "\n")
             poc_path = os.path.join(cms_path,cms_name)
             for path, dirs, poc_methos_list in os.walk(poc_path):#遍历poc文件，得到方法名称
                 for poc_file_name in poc_methos_list:
@@ -160,51 +145,50 @@ def Reload_POC():
                     #判断是py文件在打开  文件存在
                     if os.path.isfile(poc_name_path) and poc_file_name.endswith('.py') :
                         #判断py文件不包含.
-                        if '.' not in poc_file_name.replace(".py",""):
+                        if '.' not in poc_file_name.replace(".py", ""):
                             # print(poc_name_path)
-                            f= open(poc_name_path,"r",encoding="utf-8")
-                            #获取poc的中文名称
+                            f = open(poc_name_path, "r", encoding="utf-8")
+                            # 获取poc的中文名称
                             # printSkyBlue(cms_name)
                             poc_methos = ""  # 定义局部变量 存放poc方法
                             poc_name = ""  # 定义局部变量 存放poc名称
-                            poc_referer=""
-                            if cms_name[0:2]!="__":#判断文件夹的前两位不是下划线
+                            poc_referer = ""
+                            if cms_name[0:2] != "__":  # 判断文件夹的前两位不是下划线
                                 for name in f.readlines():
                                     # print(name)
-                                    #得到中文poc_name
-                                    if "name:"in name:
-                                        poc_name = name.split(":")[1].replace(" ","")
-                                        poc_name=poc_name.replace("\n","").replace("\r","").replace("\r\n","")
+                                    # 得到中文poc_name
+                                    if "name:" in name:
+                                        poc_name = name.split(":")[1].replace(" ", "")
+                                        poc_name = poc_name.replace("\n", "").replace("\r", "").replace("\r\n", "")
                                         # print(poc_name)
-                                    #得到调用的poc_methos
-                                    if "class " in name:
-                                        # print(name)
-                                        poc_methos = name.replace(":","").split(" ")[1].replace("\n","").replace("\r","").replace("\r\n","").replace("()","")
-                                        # printBlue(poc_methos)
-                                    #得到调用的poc_referer
-                                    if "referer" in  name:
-                                        poc_referer= name.replace(":","").split(" ")[1].replace("\n","").replace("\r","").replace("\r\n","")
-                                        # printBlue(poc_referer)
-                                #读取文件光标恢复到初始位置
+                                    # 得到调用的poc_methos
+                                    # self.Ui.textEdit_log.append(poc_methos)
+                                    # 得到调用的poc_referer
+                                    if "referer" in name:
+                                        poc_referer = name.replace(":", "").split(" ")[1].replace("\n", "").replace(
+                                            "\r", "").replace("\r\n", "")
+                                        # self.Ui.textEdit_log.append(poc_referer)
+                                # 读取文件光标恢复到初始位置
                                 f.seek(0)
-                                condata = f.read() ##所有数据
+                                condata = f.read()  ##所有数据
                                 # print(condata)
-                                #匹配描述
-                                comment= re.compile(r"description:(.*?)'''",re.DOTALL)
-                                poc_description= str(comment.findall(condata)[0]).replace("\"","").replace(" ","").replace("\n","\n\t")
-                                # print(poc_description)
-                                # print(poc_name)
-                                if poc_name !="" and poc_methos!="":
-                                #将数据插入到表中
-                                    cursor.execute('insert into POC (cmsname, pocname,pocmethods,pocreferer,pocdescription) values ("%s","%s","%s","%s","%s")'%(cms_name,poc_name,poc_methos,poc_referer,poc_description))
-                                    data = "from Plugins." +cms_name+"."+ poc_file_name.replace(".py","")+ " import " + poc_methos+"\n"
-                                    cmsmain_file.write(data)
+                                # 匹配描述
+                                comment = re.compile(r"description:(.*?)'''", re.DOTALL)
+                                poc_description = str(comment.findall(condata)[0]).replace("\"", "").replace(" ",                                                                           "")
+                                if poc_name != "":
+                                    poc_methos = poc_file_name[:-3]
+                                    # print(poc_methos)
+                                    # 将数据插入到表中
+                                    cursor.execute(
+                                        'insert into POC (cmsname, pocname,pocfilename,pocreferer,pocdescription,pocmethods) values ("%s","%s","%s","%s","%s","%s")' % (
+                                            cms_name, poc_name, poc_file_name, poc_referer, poc_description,
+                                            poc_methos))
                             f.close()
                         else:
                             printRed("[E]Error:%s文件加载失败，文件名中不允许包含英文符号点！"%(cms_name+"/"+poc_file_name))
+                            return 0
                     else:
                         pass
-            cmsmain_file.write("\n")
         conn.commit()#提交
         result = cursor.fetchall()
         if not len(result):
@@ -216,7 +200,6 @@ def Reload_POC():
         else:
             printRed("[E]Error:数据库更新失败，原因:"+str(result))
         conn.close()
-        cmsmain_file.close()
     except Exception as e:
         printRed("[E]Error:数据写入失败！\n Exception:%s"%e)
         sys.exit(1)
@@ -273,7 +256,7 @@ def list_cms_poc():
             print(" I D ".center(5), "|", "CMS_NAME".center(20), "|", "POC_METHOS".center(40), "|",   #居中显示
                   "POC_NAME".center(40))
             for single in values:
-                print(""+str(single[0]).center(5),"|",str(single[1]).center(20),"|",str(single[2]).center(40),"|",str(single[3]).center(40))
+                print(""+str(single[0]).center(5),"|",str(single[1]).center(20),"|",str(single[6]).center(40),"|",str(single[3]).center(40))
            # printGreen_no(, str(single[1]),str(single[2]),str(single[3]))
             #printGreen_no("\n")
             printGreen("-----------------------------------------------------------------------------------------------------------------------------------")
@@ -318,6 +301,7 @@ def check_sql(sql):
     return values
 
 def check_vuln(url_list,poc_list,save_file,threadnum):
+
     # print(save_file,threadnum)
     # print(save_file)
     threads = []
@@ -328,35 +312,79 @@ def check_vuln(url_list,poc_list,save_file,threadnum):
         # printYellow(file_type)
         # printYellow(file_name)
         if file_type == 'html':
-            save = open(file_name, 'a', encoding='gbk')
+            save = open(file_name, 'w', encoding='gbk')
             save.write('''
-                        <html>
-                        <body>
-                        <h1 align="center">FrameScan Sacn Result</h1>
-                        <table border = "1"  align="center">
-                        <tr>
-                        <th>URL</th>
-                        <th>Result</th>
-                        <th>Vuln_Name</th>
-                        <th>POC_Methods</th>
-                        <th>Payload</th>
-                        </tr>''')
+<html>
+<head>
+    <title>FrameScan Sacn Result</title>
+    <style type="text/css">
+        /*表格样式*/			
+        table {
+            table-layout: fixed;
+            word-break:break-all;
+            width: 100%;
+            background: #ccc;
+            margin: 10px auto;
+            border-collapse: collapse;
+        }				
+        th,td {
+            text-align: center;
+            border: 1px solid #ccc;
+        }		
+        th {
+            background: #eee;
+            font-weight: normal;
+        }		
+        tr {
+            background: #fff;
+        }		
+        tr:hover {
+            background: #cc0;
+        }		
+        td a {
+            color: #06f;
+            text-decoration: none;
+        }		
+        td a:hover {
+            color: #06f;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h2 align="center">FrameScan Sacn Result</h2>
+    <table align="center">
+    <thead>
+        <tr>
+            <th>URL地址</th>
+            <th>漏洞名称</th>
+            <th>漏洞描述</th>
+            <th>漏洞链接</th>
+            <th>POC脚本位置</th>
+            <th width=20%>Payload</th>
+            <th>扫描结果</th>
+        </tr>
+    </thead>
+    <tbody>''')
             save.close()
     printBlue(FLAGLET)
     printBlue("[-]Start:开始执行")
     printBlue("[*]Info:共加载%s个URL"%len(url_list))
     printBlue("[*]Info:共加载%s种漏洞" % len(poc_list))
-    printYellow("[-]Start:开始扫描...")
-    printGreen(
-        "----------------------------------------------------------------------------------------")
+    printYellow("[*]Info:正在创建队列...")
     for url in url_list:
-        for methods in poc_list:
-            portQueue.put(url+ '$$$' + methods[0]+ '$$$' + methods[1]+'$$$'+save_file)
+        for all in poc_list:
+            filename = 'Plugins/' + all[0] + '/' + all[1]
+            poc_methods = 'Plugins.' + all[0] + '.' + all[2]
+            portQueue.put(url+ '$$$' + filename + '$$$' + poc_methods+'$$$'+all[3]+'$$$'+all[4]+'$$$'+save_file)
             # print(url,methods[0])
     if threadnum>portQueue.qsize():
         threadnum = portQueue.qsize()
+    printYellow("[-]Start:开始扫描...")
+    printGreen(
+            "----------------------------------------------------------------------------------------")
     for i in range(threadnum):
-        thread = threading.Thread(target=vuln_start, args=(portQueue,save_file))
+        thread = threading.Thread(target=vuln_start, args=(portQueue,))
         # thread.setDaemon(True)  # 设置为后台线程，这里默认是False，设置为True之后则主线程不用等待子线程
         threads.append(thread)
         thread.start()
@@ -365,25 +393,38 @@ def check_vuln(url_list,poc_list,save_file,threadnum):
     printGreen(
             "----------------------------------------------------------------------------------------")
     printYellow("[-]End:扫描结束！")
+    if len(vuln_data) != 0:
+        printYellow('[-]Success:共扫描到%s个漏洞！'%len(vuln_data))
+        # print(vuln_data)
+        for i in vuln_data:
+            printGreen("[*] "+i[3]+'----'+i[0]+'----'+i[1]+'----'+i[2])
+    else:
+        printYellow('[-]End:未发现漏洞！')
     sys.exit(1)
-def vuln_start(portQueue,save_file):
+def vuln_start(portQueue):
     while 1:
         if portQueue.empty():  # 队列空就结束
             break
         all = portQueue.get()  # 从队列中取出
         url = all.split('$$$')[0]
-        methods = all.split('$$$')[1]
-        methods_name = all.split('$$$')[2]
+        poc_filename= all.split('$$$')[1]
+        poc_methods = all.split('$$$')[2]
+        poc_description = all.split('$$$')[3]
+        poc_referer = all.split('$$$')[4]
+        save_file = all.split('$$$')[5]
         if save_file!="":
-            file_type= save_file.split('$$$')[0]
-            file_name =save_file.split('$$$')[1]
+            file_type= all.split('$$$')[5]
+            file_name =all.split('$$$')[6]
         else:
             file_type=''
-        #使用eval方法将字符串转换为可以执行的函数
         try:
-            return_data = eval(methods)(url).run()
+            nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+            # result = nnnnnnnnnnnn1.run(url)
+            return_data = nnnnnnnnnnnn1.run(url)
             # print (return_data)
             if return_data[2] == '存在' and return_data[2] != '':
+                return_data.append(url)
+                vuln_data.append(return_data)
                 printGreen("[*] %s----%s----%s\n[*]Payload:%s。" % (
                 url, return_data[0], return_data[2], return_data[1]))
             elif return_data[2] == '错误' and return_data[2] != '':
@@ -396,20 +437,23 @@ def vuln_start(portQueue,save_file):
             if file_type == 'txt' and return_data[2] != '不存在':
                 save = open(file_name, 'a', encoding='utf-8')
                 save.write(
-                    "%s----%s----%s----Payload:%s。\n" % (url, return_data[0], return_data[2], return_data[1]))
+                    "%s----%s----%s----Payload:%s。\n" % (url, return_data[0], return_data[2], return_data[1],poc_filename))
                 save.close()
             if file_type == 'html' and return_data[2] != '不存在':
                 save = open(file_name, 'a', encoding='gbk')
-                save.write('''  <tr>
-                                    <td>%s</td>
-                                    <td>%s</td>
-                                    <td>%s</td>
-                                    <td>%s</td>
-                                    <td>%s</td>
-                                    </tr>\n''' % (url, return_data[2], return_data[0], methods,return_data[1] ))
+                save.write('''  
+    <tr>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+        <td>%s</td>
+    </tr>\n''' % (url, return_data[0],poc_description,poc_referer,poc_filename,return_data[1],return_data[2]))
                 save.close()
         except Exception as e:
-            printRed("[E]Error:%s脚本执行错误！方法名：%s"%(methods_name,methods))
+            printRed("[E]Error:%s脚本执行错误!"%(poc_filename))
             printRed("[E]Error:%s"%e)
     # printYellow("[-]End:扫描结束！")
 def get_url_list(path):
@@ -457,12 +501,12 @@ def Judgement_parameter(Command_dict):
             else:
                 threadnum = 10
             if "module" in Command_dict:
-                sql_data = "select pocmethods,pocname from POC where pocmethods='%s'" % Command_dict['module']
+                sql_data = "select cmsname,pocfilename,pocmethods,pocdescription,pocreferer from POC where pocmethods='%s'" % Command_dict['module']
             elif "CMS" in Command_dict:
-                sql_data = "select pocmethods,pocname from POC where cmsname='%s'" % Command_dict['CMS']
+                sql_data = "select cmsname,pocfilename,pocmethods,pocdescription,pocreferer from POC where cmsname='%s'" % Command_dict['CMS']
             elif  (('html' in Command_dict) or ('txt' in Command_dict) or ("module" not in Command_dict or "CMS" in Command_dict)):
                 # -u参数
-                sql_data = "select pocmethods,pocname from POC"
+                sql_data = "select cmsname,pocfilename,pocmethods,pocdescription,pocreferer from POC"
             if sql_data != "":
                 poc_list = check_sql(sql_data)
                 if len(poc_list)==0:
@@ -495,12 +539,6 @@ if __name__ == '__main__':
     if not os.path.isfile(DB_NAME):
         printBlue(FLAGLET)
         printRed("[E]Error:数据库文件不存在，请执行-r重新加载数据文件！")
-        sys.exit(1)
-    try:
-        from Plugins.Plugins import *
-    except:
-        printBlue(FLAGLET)
-        printRed("[E]Error:CMS数据库文件引入错误，请执行-r重新加载数据文件！")
         sys.exit(1)
     Command_dict=getparameter()
     # #测试输出
