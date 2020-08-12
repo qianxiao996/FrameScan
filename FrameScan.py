@@ -15,7 +15,7 @@ vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "POC_DB.db"  #存储的数据库名
-VERSION = "V1.3 20200515"
+VERSION = "V1.4 20200812"
 FLAGLET = ("""
      _____                         ____                  
     |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -143,7 +143,8 @@ def Reload_POC():
                     poc_name_path = poc_name_path.replace("\\", "/")
                     #print(poc_name_path)
                     #判断是py文件在打开  文件存在
-                    if os.path.isfile(poc_name_path) and poc_file_name.endswith('.py') :
+                    # print(poc_file_name[-7:])
+                    if os.path.isfile(poc_name_path) and poc_file_name.endswith('.py') and poc_file_name[-7:]=='_poc.py' :
                         #判断py文件不包含.
                         if '.' not in poc_file_name.replace(".py", ""):
                             # print(poc_name_path)
@@ -300,20 +301,16 @@ def check_sql(sql):
     values = cursor.fetchall()
     return values
 
-def check_vuln(url_list,poc_list,save_file,threadnum):
+def check_vuln(url_list,poc_list,threadnum):
 
     # print(save_file,threadnum)
     # print(save_file)
     threads = []
     portQueue = queue.Queue()  # 待检测端口队列，会在《Python常用操作》一文中更新用法
-    if save_file!="":
-        file_type = save_file.split('$$$')[0]
-        file_name = save_file.split('$$$')[1]
-        # printYellow(file_type)
-        # printYellow(file_name)
-        if file_type == 'html':
-            save = open(file_name, 'w', encoding='gbk')
-            save.write('''
+
+    if savefiletype == 'html':
+        save = open(savefilename, 'w', encoding='gbk')
+        save.write('''
 <html>
 <head>
     <title>FrameScan Sacn Result</title>
@@ -366,23 +363,26 @@ def check_vuln(url_list,poc_list,save_file,threadnum):
         </tr>
     </thead>
     <tbody>''')
-            save.close()
+        save.close()
     printBlue(FLAGLET)
     printBlue("[-]Start:开始执行")
+    # print(savefiletype)
     printBlue("[*]Info:共加载%s个URL"%len(url_list))
     printBlue("[*]Info:共加载%s种漏洞" % len(poc_list))
     printYellow("[*]Info:正在创建队列...")
     for url in url_list:
         for all in poc_list:
-            filename = 'Plugins/' + all[0] + '/' + all[1]
-            poc_methods = 'Plugins.' + all[0] + '.' + all[2]
-            portQueue.put(url+ '$$$' + filename + '$$$' + poc_methods+'$$$'+all[3]+'$$$'+all[4]+'$$$'+save_file)
+            # print(all)
+            poc_filename = 'Plugins/' + all[1] + '/' + all[2]
+            # print(filename)
+            poc_methods = 'Plugins.' + all[1]+ '.' + all[6]
+            portQueue.put(url+ '$$$' + poc_filename + '$$$' + poc_methods+'$$$'+all[3]+'$$$'+all[4]+'$$$'+all[5]+'$$$'+savefiletype+'$$$'+savefilename)
             # print(url,methods[0])
     if threadnum>portQueue.qsize():
         threadnum = portQueue.qsize()
     printYellow("[-]Start:开始扫描...")
     printGreen(
-            "----------------------------------------------------------------------------------------")
+            "-"*80)
     for i in range(threadnum):
         thread = threading.Thread(target=vuln_start, args=(portQueue,))
         # thread.setDaemon(True)  # 设置为后台线程，这里默认是False，设置为True之后则主线程不用等待子线程
@@ -391,13 +391,16 @@ def check_vuln(url_list,poc_list,save_file,threadnum):
     for t in threads:
         t.join()
     printGreen(
-            "----------------------------------------------------------------------------------------")
+            "-"*80)
     printYellow("[-]End:扫描结束！")
     if len(vuln_data) != 0:
         printYellow('[-]Success:共扫描到%s个漏洞！'%len(vuln_data))
-        # print(vuln_data)
+        printGreen('\n[-]漏洞详情')
+        printGreen(
+                "-"*50)
         for i in vuln_data:
-            printGreen("[*] "+i[3]+'----'+i[0]+'----'+i[1]+'----'+i[2])
+            printGreen(i.strip()+'\n')
+
     else:
         printYellow('[-]End:未发现漏洞！')
     sys.exit(1)
@@ -409,53 +412,51 @@ def vuln_start(portQueue):
         url = all.split('$$$')[0]
         poc_filename= all.split('$$$')[1]
         poc_methods = all.split('$$$')[2]
-        poc_description = all.split('$$$')[3]
+        poc_name = all.split('$$$')[3]
         poc_referer = all.split('$$$')[4]
-        save_file = all.split('$$$')[5]
-        if save_file!="":
-            file_type= all.split('$$$')[5]
-            file_name =all.split('$$$')[6]
-        else:
-            file_type=''
+        poc_description = all.split('$$$')[5]
+        save_type =  all.split('$$$')[6]
+        save_name = all.split('$$$')[7]
         try:
             nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
             # result = nnnnnnnnnnnn1.run(url)
             return_data = nnnnnnnnnnnn1.run(url)
             # print (return_data)
-            if return_data[2] == '存在' and return_data[2] != '':
-                return_data.append(url)
-                vuln_data.append(return_data)
-                printGreen("[*] %s----%s----%s\n[*]Payload:%s。" % (
-                url, return_data[0], return_data[2], return_data[1]))
-            elif return_data[2] == '错误' and return_data[2] != '':
+            if return_data[1] == '存在' and return_data[1] != '':
+                # return_data.append(url)
+                vuln_info = "[*]%s\n[*]漏洞名称:%s---%s\n[*]漏洞描述:%s\n[*]漏洞来源:%s\n[*]插件路径:%s\n[*]Payload:\n%s" % (
+                url.strip(),poc_name, return_data[1],poc_description.strip(),poc_referer.strip(),poc_filename,return_data[0])
+                vuln_data.append(vuln_info)
+                printGreen("[*]Info:%s----%s----%s。" % (url, poc_name, return_data[1]))
+            elif return_data[1] == '错误' and return_data[1] != '':
                 printRed(
-                    "[*]Error:%s----%s----%s扫描出现错误。" % (url, return_data[0], return_data[2]))
-            elif return_data[2] == '不存在' and return_data[2] != '':
-                printBlue("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
+                    "[*]Error:%s----%s----%s扫描出现错误。" % (url, poc_name,poc_filename))
+            elif return_data[1] == '不存在' and return_data[1] != '':
+                printBlue("[*]Info:%s----%s----%s。" % (url, poc_name, return_data[1]))
             else:
-                printPink("[*]Info:%s----%s----%s。" % (url, return_data[0], return_data[2]))
-            if file_type == 'txt' and return_data[2] != '不存在':
-                save = open(file_name, 'a', encoding='utf-8')
-                save.write(
-                    "%s----%s----%s----Payload:%s。\n" % (url, return_data[0], return_data[2], return_data[1],poc_filename))
+                printPink("[*]Info:%s----%s----%s。" % (url, poc_name, return_data[1]))
+            if save_type == 'txt' and return_data[1] != '不存在':
+                save = open(save_name, 'a', encoding='utf-8')
+                save.write("[*]%s\n[*]漏洞名称:%s---%s\n[*]漏洞描述:%s\n[*]漏洞来源:%s\n[*]插件路径:%s\n[*]Payload:\n%s\n\n" % (
+                url.strip(),poc_name, return_data[1],poc_description.strip(),poc_referer.strip(),poc_filename,return_data[0]))
                 save.close()
-            if file_type == 'html' and return_data[2] != '不存在':
-                save = open(file_name, 'a', encoding='gbk')
+            if save_type == 'html' and return_data[1] != '不存在':
+                save = open(save_name, 'a', encoding='gbk')
                 save.write('''  
     <tr>
-        <td>%s</td>
-        <td>%s</td>
-        <td>%s</td>
-        <td>%s</td>
-        <td>%s</td>
-        <td>%s</td>
-        <td>%s</td>
-    </tr>\n''' % (url, return_data[0],poc_description,poc_referer,poc_filename,return_data[1],return_data[2]))
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    <td>%s</td>
+    </tr>\n''' % (url, poc_name,poc_description,poc_referer,poc_filename,return_data[0],return_data[1]))
                 save.close()
         except Exception as e:
+            # print(str(e))
             printRed("[E]Error:%s脚本执行错误!"%(poc_filename))
             printRed("[E]Error:%s"%e)
-    # printYellow("[-]End:扫描结束！")
 def get_url_list(path):
     all_list =[]
     if os.path.exists(path):
@@ -495,18 +496,30 @@ def Judgement_parameter(Command_dict):
             printRed("[E]Error:-m参数和-c参数不能同时使用！")
             sys.exit(1)
         else:
+            global savefiletype
+            global savefilename
             sql_data = ""
             if 'threads' in Command_dict:
                 threadnum = int(Command_dict['t'])
             else:
                 threadnum = 10
             if "module" in Command_dict:
-                sql_data = "select cmsname,pocfilename,pocmethods,pocdescription,pocreferer from POC where pocmethods='%s'" % Command_dict['module']
+                sql_data = "select * from POC where pocmethods='%s'" % Command_dict['module']
             elif "CMS" in Command_dict:
-                sql_data = "select cmsname,pocfilename,pocmethods,pocdescription,pocreferer from POC where cmsname='%s'" % Command_dict['CMS']
-            elif  (('html' in Command_dict) or ('txt' in Command_dict) or ("module" not in Command_dict or "CMS" in Command_dict)):
+                sql_data = "select * from POC where cmsname='%s'" % Command_dict['CMS']
+            else:
                 # -u参数
-                sql_data = "select cmsname,pocfilename,pocmethods,pocdescription,pocreferer from POC"
+                sql_data = "select * from POC"
+                
+            if 'html' in Command_dict  :
+                savefiletype = 'html'
+                savefilename = Command_dict['html']
+            elif 'txt' in Command_dict:
+                savefiletype= 'txt'
+                savefilename = Command_dict['txt']
+            else:
+                savefiletype= ''
+                savefilename=''
             if sql_data != "":
                 poc_list = check_sql(sql_data)
                 if len(poc_list)==0:
@@ -514,12 +527,12 @@ def Judgement_parameter(Command_dict):
                     printRed("[E]Error:未查询到POC！")
                     sys.exit(1)
                 if "txt" in Command_dict:
-                    check_vuln(url_list, poc_list, "txt$$$" + Command_dict['txt'],threadnum)
+                    check_vuln(url_list, poc_list,threadnum)
                 if "html" in Command_dict:
-                    check_vuln(url_list, poc_list, "html$$$" + Command_dict['html'],threadnum)
+                    check_vuln(url_list, poc_list,threadnum)
                 else:
                     # print(url_list)
-                    check_vuln(url_list, poc_list, "",threadnum)
+                    check_vuln(url_list, poc_list,threadnum)
 
             else:
                 printBlue(FLAGLET)
