@@ -127,6 +127,8 @@ python3 FrameScan.py -u URL -html  文件名
 
 ## 自定义POC模板
 
+后缀名必须为_poc.py
+
 代码中采用自定义彩色输出，请尽量规范编写。脚本中为示例代码。
 
 ```python
