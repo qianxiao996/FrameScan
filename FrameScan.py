@@ -19,7 +19,7 @@ vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "VULN_DB.db"  #存储的数据库名
-VERSION = "V1.6 20210521"
+VERSION = "V1.6.1 20210523"
 FLAGLET = ("""
         _____                         ____                  
         |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -142,7 +142,7 @@ def Reload_POC():
         # 创建一个游标 curson
         cursor = conn.cursor()
         # 执行一条语句,创建 user表 如不存在创建
-        sql = 'create table IF NOT EXISTS vuln_poc ("id" integer PRIMARY KEY AUTOINCREMENT,"cms_name" varchar(30),"vuln_file" varchar(50),"vuln_name" varchar(30),"vuln_author" varchar(50),"vuln_referer" varchar(50),"vuln_description" varchar(200),"vuln_identifier" varchar(100),"vuln_solution" varchar(500),  "ispoc" integer(1),"isexp" integer(1))'
+        sql ='CREATE TABLE `vuln_poc`  (`id` int(255) NULL DEFAULT NULL,`cms_name` varchar(255),`vuln_file` varchar(255),`vuln_name` varchar(255),`vuln_author` varchar(255),`vuln_referer` varchar(255),`vuln_description` varchar(255),`vuln_identifier` varchar(255),`vuln_solution` varchar(255),`ispoc` int(255) NULL DEFAULT NULL,`isexp` int(255) NULL DEFAULT NULL,`vuln_class` varchar(255),`FofaQuery_link` varchar(255),`target` varchar(1000),`FofaQuery` varchar(255))'        
         cursor.execute(sql)
         print(Fore.GREEN+("[+]Success:创建数据库完成!"))
     except:
@@ -151,6 +151,7 @@ def Reload_POC():
     print(Fore.BLUE+("[*]Info:正在写入数据..."))
     # cms_path='Plugins/'
     try:
+        id=1
         plugins_path = "Plugins/"
         plugins_path = plugins_path.replace("\\", "/")
         for cms_name in os.listdir(plugins_path):  # 遍历目录名
@@ -169,13 +170,24 @@ def Reload_POC():
                             nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_name_path[:-3],
                                                                                  poc_name_path).load_module()
                             vuln_info = nnnnnnnnnnnn1.vuln_info()
+                            if vuln_info.get('vuln_class'):
+                                vuln_class =vuln_info.get('vuln_class')
+                            else:
+                                vuln_class='未分类'
+                            if vuln_info.get('FofaQuery_link'):
+                                FofaQuery_link =(vuln_info.get('FofaQuery_link'))
+                            else:
+                                FofaQuery_link=''
+                            if vuln_info.get('FofaQuery'):
+                                FofaQuery =vuln_info.get('FofaQuery')
+                            else:
+                                FofaQuery=''
                             # 将数据插入到表中
-                            cursor.execute(
-                                'insert into vuln_poc (cms_name, vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp) values ("%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")' % (
-                                    cms_name, poc_file_name, vuln_info['vuln_name'], vuln_info['vuln_author'],
-                                    vuln_info['vuln_referer'], vuln_info['vuln_description'],
-                                    vuln_info['vuln_identifier'], vuln_info['vuln_solution'], vuln_info['ispoc'],
-                                    vuln_info['isexp']))
+                            insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_link,FofaQuery,target) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                            cursor.execute(insert_sql, (
+                                        id,cms_name, poc_file_name,vuln_info['vuln_name'],vuln_info['vuln_author'] , vuln_info['vuln_referer'], vuln_info['vuln_description'],
+                                        vuln_info['vuln_identifier'],vuln_info['vuln_solution'],vuln_info['ispoc'],vuln_info['isexp'],vuln_class,FofaQuery_link,FofaQuery,'[]'))
+                            id=id+1
                         except Exception as  e:
                             print(Fore.RED+(
                                 "Error:%s脚本执行错误！<br>[Exception]:<br>%s</p>\n" % (
@@ -509,14 +521,22 @@ def exp_start(url_list,poc,timeout,exp_type,cmd):
         try:
             with eventlet.Timeout(timeout, False):
                 if exp_type=="shell":
-                    ip_port = cmd.split(":")
-                    ip = ip_port[0]
-                    port = int(ip_port[1])
+                    try:
+                        ip_port = cmd.split(":")
+                    except:
+                        print(Fore.RED+("[E]Error:请输入正确的反弹IP和端口,示例：127.0.0.1:8888"))
+                        continue
+                    if len(ip_port)==2:
+                        ip = ip_port[0]
+                        port = int(ip_port[1])
+                    else:
+                        print(Fore.RED+("[E]Error:请输入正确的反弹IP和端口,示例：127.0.0.1:8888"))
+                        continue
                     nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                    return_data = nnnnnnnnnnnn1.do_exp(url, "", "", exp_type, cmd, ip,port)
+                    return_data = nnnnnnnnnnnn1.do_exp(url, "",  exp_type, cmd, ip,port)
                 else:
                     nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                    return_data = nnnnnnnnnnnn1.do_exp(url, "", "", exp_type, cmd)
+                    return_data = nnnnnnnnnnnn1.do_exp(url, "", exp_type, cmd)
                 if return_data['type'] == 'Result':
                     print(Fore.GREEN+("[*]EXP_Result:\n%s\n"%(return_data['value'])))
                 else:
@@ -552,7 +572,7 @@ def vuln_start(portQueue):
                     port = 80
                 url = scheme + '://' + hostname + ':' + str(port) + '/'
                 nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                return_data = nnnnnnnnnnnn1.do_poc(url,hostname,port,scheme)
+                return_data = nnnnnnnnnnnn1.do_poc(url,"",hostname,port,scheme)
                 if return_data['type'] == 'Result' and return_data['value'] == '存在':
                     # return_data.append(url)
                     vuln_info = "[*]URL:%s\n[*]漏洞名称:%s\n[*]测试结果:%s\n[*]漏洞编号:%s\n[*]漏洞描述:%s\n[*]漏洞来源:%s\n[*]插件路径:%s\n[*]Payload:\n%s" % (
