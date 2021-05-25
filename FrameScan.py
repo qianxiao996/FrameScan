@@ -19,7 +19,7 @@ vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "VULN_DB.db"  #存储的数据库名
-VERSION = "V1.6.1 20210523"
+VERSION = "V1.6.2 20210525"
 FLAGLET = ("""
         _____                         ____                  
         |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -533,14 +533,20 @@ def exp_start(url_list,poc,timeout,exp_type,cmd):
                         print(Fore.RED+("[E]Error:请输入正确的反弹IP和端口,示例：127.0.0.1:8888"))
                         continue
                     nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                    return_data = nnnnnnnnnnnn1.do_exp(url, "",  exp_type, cmd, ip,port)
+                    result = nnnnnnnnnnnn1.do_exp(url, "",  exp_type, cmd, ip,port)
                 else:
                     nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                    return_data = nnnnnnnnnnnn1.do_exp(url, "", exp_type, cmd)
-                if return_data['type'] == 'Result':
-                    print(Fore.GREEN+("[*]EXP_Result:\n%s\n"%(return_data['value'])))
+                    result = nnnnnnnnnnnn1.do_exp(url, "", exp_type, cmd)
+
+                if result.get('Result'):
+                    print(Fore.GREEN+("[*]EXP_Result:\n%s\n"%(result.get('Result_Info'))))
+                # 不存在
                 else:
-                    print(Fore.GREEN+("[*]EXP_Result:\n%s\n"%(return_data['value'])))
+                    print(Fore.BLUE+(
+                            "[*]Info:%s----%s----%s。" % (url, poc[3], "漏洞不存在")))
+                if result.get('Error_Info'):
+                    print(Fore.RED+(
+                            "[E]Error:%s----%s----%s。" % (url, poc[3], result.get("Error_Info"))))
                 continue
             print(Fore.RED+("[E]Error:%s运行超时！" % (poc_filename)))
         except Exception as  e:
@@ -572,28 +578,30 @@ def vuln_start(portQueue):
                     port = 80
                 url = scheme + '://' + hostname + ':' + str(port) + '/'
                 nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                return_data = nnnnnnnnnnnn1.do_poc(url,"",hostname,port,scheme)
-                if return_data['type'] == 'Result' and return_data['value'] == '存在':
+                result = nnnnnnnnnnnn1.do_poc(url,"",hostname,port,scheme)
+                if result.get('Result'):
                     # return_data.append(url)
-                    vuln_info = "[*]URL:%s\n[*]漏洞名称:%s\n[*]测试结果:%s\n[*]漏洞编号:%s\n[*]漏洞描述:%s\n[*]漏洞来源:%s\n[*]插件路径:%s\n[*]Payload:\n%s" % (
-                    url.strip(),poc_name,poc_bianhao, return_data['value'],poc_description.strip(),poc_referer.strip(),poc_filename,return_data['payload'])
+                    vuln_info = "[*]URL:%s\n[*]漏洞名称:%s\n[*]漏洞编号:%s\n[*]测试结果:%s\n[*]漏洞描述:%s\n[*]漏洞来源:%s\n[*]插件路径:%s\n[*]Payload:\n%s" % (
+                    url.strip(),poc_name,poc_bianhao,"存在",poc_description.strip(),poc_referer.strip(),poc_filename,result.get("Result_Info"))
                     vuln_data.append(vuln_info)
-                    output([url.strip(),poc_name,return_data['value'],poc_description.strip(),poc_referer.strip(),poc_filename,return_data['payload'],poc_bianhao.strip()])
+                    output([url.strip(),poc_name,"存在",poc_description.strip(),poc_referer.strip(),poc_filename,result.get("Result_Info"),poc_bianhao.strip()])
                     if poc_bianhao:
-                        print(Fore.GREEN+("[*]Info:%s----%s(%s)----%s----%s。" % (url, poc_name,poc_bianhao, return_data['value'],return_data['payload'])))
+                        print(Fore.GREEN+("[*]Info:%s----%s(%s)----%s----%s。" % (url, poc_name,poc_bianhao,"存在",result.get("Result_Info"))))
                     else:
-                        print(Fore.GREEN+("[*]Info:%s----%s----%s----%s。" % (url, poc_name, return_data['value'],return_data['payload'])))
+                        print(Fore.GREEN+("[*]Info:%s----%s----%s----%s。" % (url, poc_name, "存在",result.get("Result_Info"))))
 
-                elif return_data['type'] == '不存在' and return_data['value'] == '不存在':
-                    print(Fore.BLUE+(
-                            "[*]Info:%s----%s----%s。" % (url, poc_name, return_data['value'])))
+                # 不存在
                 else:
-                    print(Fore.CYAN+("[*]Info:%s----%s----%s。" % (url, poc_name, return_data['value'])))
+                    print(Fore.BLUE+(
+                            "[*]Info:%s----%s----%s。" % (url, poc_name, "不存在")))
+                if result.get('Error_Info'):
+                    print(Fore.RED+(
+                            "[E]Error:%s----%s----%s。" % (url, poc_name, result.get("Error_Info"))))
                 continue
             except Exception as e:
                 # print(str(e))
                 print(Fore.RED+("[E]Error:%s脚本执行错误!"%(poc_filename)))
-                print(Fore.RED+("[E]Error:%s"%e))
+                print(Fore.RED+("[E]Error:%s %s行"%(e,str(e.__traceback__.tb_lineno))))
                 continue
         print(Fore.RED+("[E]Error:%s脚本运行超时!"%(poc_filename)))
 
