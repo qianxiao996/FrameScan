@@ -19,7 +19,7 @@ vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "VULN_DB.db"  #存储的数据库名
-VERSION = "V1.6.2 20210525"
+VERSION = "V1.6.3 20210831"
 FLAGLET = ("""
         _____                         ____                  
         |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -42,7 +42,7 @@ usage = FLAGLET + '''
     EXP Mode:
         -v          Use exp name             指定漏洞EXP名称
         -cmd        RCE Command(whoami)      执行cmd命令(默认:whoami)
-        -shell      Return webshell          反弹Webshell(127.0.0.1:8080)
+        -shell      Return Shell             反弹Shell(127.0.0.1:8080)
 
     Search:
         -ls         List Specify CMS poc     查找关键词漏洞(匹配漏洞名称)
@@ -520,6 +520,7 @@ def exp_start(url_list,poc,timeout,exp_type,cmd):
         eventlet.monkey_patch(time=True)
         try:
             with eventlet.Timeout(timeout, False):
+                data={}
                 if exp_type=="shell":
                     try:
                         ip_port = cmd.split(":")
@@ -532,11 +533,16 @@ def exp_start(url_list,poc,timeout,exp_type,cmd):
                     else:
                         print(Fore.RED+("[E]Error:请输入正确的反弹IP和端口,示例：127.0.0.1:8888"))
                         continue
+                    data['type'] = 'shell'
+                    data['reverse_ip'] = ip
+                    data['reverse_port'] = port
                     nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                    result = nnnnnnnnnnnn1.do_exp(url, "",  exp_type, cmd, ip,port)
+                    result = nnnnnnnnnnnn1.do_exp(url, "", '','',{}, data)
                 else:
+                    data['type'] = 'cmd'
+                    data['command'] = cmd
                     nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                    result = nnnnnnnnnnnn1.do_exp(url, "", exp_type, cmd)
+                    result = nnnnnnnnnnnn1.do_exp(url, "", '','',{}, data)
 
                 if result.get('Result'):
                     print(Fore.GREEN+("[*]EXP_Result:\n%s\n"%(result.get('Result_Info'))))
