@@ -19,7 +19,7 @@ vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "VULN_DB.db"  #存储的数据库名
-VERSION = "V1.6.3 20210831"
+VERSION = "V1.6.5 20210927"
 FLAGLET = ("""
         _____                         ____                  
         |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -65,7 +65,7 @@ usage = FLAGLET + '''
         python3 FrameScan.py -u http://example.com:7001 -m exp -v CVE-2019-2729
         python3 FrameScan.py -f list.txt -txt results.txt
     --------------------------------------------------------------
-    FrameScan  %s         Blog:blog.qianxiao996.cn
+    FrameScan  %s                      by qianxiao996
     ''' % VERSION
 
 #得到输入的参数
@@ -142,7 +142,7 @@ def Reload_POC():
         # 创建一个游标 curson
         cursor = conn.cursor()
         # 执行一条语句,创建 user表 如不存在创建
-        sql ='CREATE TABLE `vuln_poc`  (`id` int(255) NULL DEFAULT NULL,`cms_name` varchar(255),`vuln_file` varchar(255),`vuln_name` varchar(255),`vuln_author` varchar(255),`vuln_referer` varchar(255),`vuln_description` varchar(255),`vuln_identifier` varchar(255),`vuln_solution` varchar(255),`ispoc` int(255) NULL DEFAULT NULL,`isexp` int(255) NULL DEFAULT NULL,`vuln_class` varchar(255),`FofaQuery_link` varchar(255),`target` varchar(1000),`FofaQuery` varchar(255))'        
+        sql = 'CREATE TABLE `vuln_poc`  (`id` int(255) NULL DEFAULT NULL,`cms_name` varchar(255),`vuln_file` varchar(255),`vuln_name` varchar(255),`vuln_author` varchar(255),`vuln_referer` varchar(255),`vuln_description` varchar(255),`vuln_identifier` varchar(255),`vuln_solution` varchar(255),`ispoc` int(255) NULL DEFAULT NULL,`isexp` int(255) NULL DEFAULT NULL,`vuln_class` varchar(255),`FofaQuery_type` varchar(255),`FofaQuery_link` varchar(255),`FofaQuery_rule` varchar(255))'
         cursor.execute(sql)
         print(Fore.GREEN+("[+]Success:创建数据库完成!"))
     except:
@@ -174,19 +174,23 @@ def Reload_POC():
                                 vuln_class =vuln_info.get('vuln_class')
                             else:
                                 vuln_class='未分类'
+                            if vuln_info.get('FofaQuery_type'):
+                                FofaQuery_type = vuln_info.get('FofaQuery_type')
+                            else:
+                                FofaQuery_type = 'http'
                             if vuln_info.get('FofaQuery_link'):
                                 FofaQuery_link =(vuln_info.get('FofaQuery_link'))
                             else:
                                 FofaQuery_link=''
-                            if vuln_info.get('FofaQuery'):
-                                FofaQuery =vuln_info.get('FofaQuery')
+                            if vuln_info.get('FofaQuery_rule'):
+                                FofaQuery_rule = vuln_info.get('FofaQuery_rule')
                             else:
-                                FofaQuery=''
+                                FofaQuery_rule = ''
                             # 将数据插入到表中
-                            insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_link,FofaQuery,target) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                            insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
                             cursor.execute(insert_sql, (
                                         id,cms_name, poc_file_name,vuln_info['vuln_name'],vuln_info['vuln_author'] , vuln_info['vuln_referer'], vuln_info['vuln_description'],
-                                        vuln_info['vuln_identifier'],vuln_info['vuln_solution'],vuln_info['ispoc'],vuln_info['isexp'],vuln_class,FofaQuery_link,FofaQuery,'[]'))
+                                        vuln_info['vuln_identifier'],vuln_info['vuln_solution'],vuln_info['ispoc'],vuln_info['isexp'],vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule))
                             id=id+1
                         except Exception as  e:
                             print(Fore.RED+(
@@ -266,6 +270,11 @@ def list_cms_vuln():
 
     else:
         print(Fore.BLUE+(FLAGLET))
+def dict_factory(self, cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
 def sql_search(sql,type='list'):
     if type=='dict':
         conn = sqlite3.connect(DB_NAME)
@@ -584,7 +593,8 @@ def vuln_start(portQueue):
                     port = 80
                 url = scheme + '://' + hostname + ':' + str(port) + '/'
                 nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                result = nnnnnnnnnnnn1.do_poc(url,"",hostname,port,scheme)
+                result = nnnnnnnnnnnn1.do_poc(url,hostname,port,scheme,'')
+                # print(result)
                 if result.get('Result'):
                     # return_data.append(url)
                     vuln_info = "[*]URL:%s\n[*]漏洞名称:%s\n[*]漏洞编号:%s\n[*]测试结果:%s\n[*]漏洞描述:%s\n[*]漏洞来源:%s\n[*]插件路径:%s\n[*]Payload:\n%s" % (
