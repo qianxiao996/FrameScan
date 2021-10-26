@@ -5,6 +5,7 @@
 #date:  2019-9-21
 #别问我为什么不用命令行解释模块，因为丑。
 import importlib
+import platform
 import sys,os
 from urllib.parse import urlparse
 from colorama import init, Fore
@@ -13,13 +14,20 @@ import eventlet
 from prettytable import PrettyTable
 import sqlite3,requests,threading
 import queue,frozen_dir
+sysstr = platform.system()
+if (sysstr == "Windows"):
+    houzhui = '.pyd'
+elif (sysstr == "Linux"):
+    houzhui = '.so'
+plugins_ext = ['.py', '.pyc']
+plugins_ext.append(houzhui)
 SETUP_DIR = frozen_dir.app_path()
 sys.path.append(SETUP_DIR)
 vuln_data=[]
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "VULN_DB.db"  #存储的数据库名
-VERSION = "V1.6.5 20210927"
+VERSION = "V1.6.6 20211026"
 FLAGLET = ("""
         _____                         ____                  
         |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -152,53 +160,58 @@ def Reload_POC():
     # cms_path='Plugins/'
     try:
         id=1
-        plugins_path = "Plugins/"
-        plugins_path = plugins_path.replace("\\", "/")
-        for cms_name in os.listdir(plugins_path):  # 遍历目录名
-            cms_path = os.path.join(plugins_path, cms_name).replace("\\", "/")
-            for poc_file_dir, poc_dirs_list, poc_file_name_list in os.walk(cms_path):
-                # print(path,dirs,poc_methos_list)
-                # print(poc_file_name_list)
-                for poc_file_name in poc_file_name_list:
-                    poc_name_path = poc_file_dir+ "\\" + poc_file_name
-                    poc_name_path = poc_name_path.replace("\\", "/")
-                    # 判断是py文件在打开  文件存在
-                    if os.path.isfile(poc_name_path) and poc_file_name.endswith('.py') and len(
-                            poc_file_name) >= 8 and poc_file_name[:8] == "Plugins_":
-                        # print(poc_name_path)
-                        try:
-                            nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_name_path[:-3],
-                                                                                 poc_name_path).load_module()
-                            vuln_info = nnnnnnnnnnnn1.vuln_info()
-                            if vuln_info.get('vuln_class'):
-                                vuln_class =vuln_info.get('vuln_class')
-                            else:
-                                vuln_class='未分类'
-                            if vuln_info.get('FofaQuery_type'):
-                                FofaQuery_type = vuln_info.get('FofaQuery_type')
-                            else:
-                                FofaQuery_type = 'http'
-                            if vuln_info.get('FofaQuery_link'):
-                                FofaQuery_link =(vuln_info.get('FofaQuery_link'))
-                            else:
-                                FofaQuery_link=''
-                            if vuln_info.get('FofaQuery_rule'):
-                                FofaQuery_rule = vuln_info.get('FofaQuery_rule')
-                            else:
-                                FofaQuery_rule = ''
-                            # 将数据插入到表中
-                            insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-                            cursor.execute(insert_sql, (
-                                        id,cms_name, poc_file_name,vuln_info['vuln_name'],vuln_info['vuln_author'] , vuln_info['vuln_referer'], vuln_info['vuln_description'],
-                                        vuln_info['vuln_identifier'],vuln_info['vuln_solution'],vuln_info['ispoc'],vuln_info['isexp'],vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule))
-                            id=id+1
-                        except Exception as  e:
-                            print(Fore.RED+(
-                                "Error:%s脚本执行错误！<br>[Exception]:<br>%s</p>\n" % (
-                                    poc_file_name, e)))
+        vuln_plugins_dir = "Plugins/"
+        all_plugins = get_dir_file(vuln_plugins_dir)
+
+        go_load_plugins = []  # 存放已经加载的模块
+        for poc in all_plugins:
+            try:
+                if os.path.splitext(poc['poc_file_name'])[-1] in plugins_ext:
+                    if os.path.splitext(poc['poc_file_name'])[-1] == '.py':
+                        nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(os.path.splitext(poc['poc_file_name'])[0],
+                                                                             poc['poc_file_path']).load_module()
+                    elif os.path.splitext(poc['poc_file_name'])[-1] in ['.pyc', '.pyd', '.so']:
+                        if os.path.splitext(poc['poc_file_name'])[0] in go_load_plugins:
                             continue
+                        module_spec = importlib.util.spec_from_file_location(os.path.splitext(poc['poc_file_name'])[0],
+                                                                             poc['poc_file_path'])
+                        nnnnnnnnnnnn1 = importlib.util.module_from_spec(module_spec)
+                        module_spec.loader.exec_module(nnnnnnnnnnnn1)
+                    vuln_info = nnnnnnnnnnnn1.vuln_info()
+                    if vuln_info.get('vuln_class'):
+                        vuln_class = vuln_info.get('vuln_class')
+                    else:
+                        vuln_class = '未分类'
+                    if vuln_info.get('FofaQuery_type'):
+                        FofaQuery_type = vuln_info.get('FofaQuery_type')
+                    else:
+                        FofaQuery_type = 'http'
+                    if vuln_info.get('FofaQuery_link'):
+                        FofaQuery_link = (vuln_info.get('FofaQuery_link'))
+                    else:
+                        FofaQuery_link = '/'
+
+                    if vuln_info.get('FofaQuery_rule'):
+                        FofaQuery_rule = vuln_info.get('FofaQuery_rule')
+                    else:
+                        FofaQuery_rule = ''
+                    insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+
+                    # 将数据插入到表中
+                    cursor.execute(insert_sql, (
+                        id, poc['cms_name'], os.path.splitext(poc['poc_file_name'])[0], vuln_info['vuln_name'],
+                        vuln_info['vuln_author'],
+                        vuln_info['vuln_referer'], vuln_info['vuln_description'],
+                        vuln_info['vuln_identifier'], vuln_info['vuln_solution'], vuln_info['ispoc'],
+                        vuln_info['isexp'], vuln_class, FofaQuery_type, FofaQuery_link, FofaQuery_rule))
+                    id = id + 1
+                    go_load_plugins.append(os.path.splitext(poc['poc_file_name'])[0])
+            except Exception as  e:
+                print(Fore.RED+"[E]Error:%s脚本执行错误！\n[Exception]:\n%s</a>" % (poc['poc_file_name'],str(e)))
+                continue
             conn.commit()  # 提交
 
+        # print(result)
         cursor.execute("select count(ispoc) from vuln_poc where ispoc =1")
         poc_num = cursor.fetchall()
         cursor.execute("select count(isexp) from vuln_poc where isexp =1")
@@ -214,6 +227,32 @@ def Reload_POC():
             "Error:数据写入失败！\n[Exception]:\n%s</p>" % (e)))
         sys.exit(1)
 
+def get_dir_file(dir):
+    all_plugins = []
+    plugins_path = dir
+    plugins_path = plugins_path.replace("\\", "/")
+    for cms_name in os.listdir(plugins_path):  # 遍历目录名
+        cms_path = os.path.join(plugins_path, cms_name).replace("\\", "/")
+        for poc_file_dir, poc_dirs_list, poc_file_name_list in os.walk(cms_path):  # 遍历poc文件，得到方法名称
+            # print(path,dirs,poc_methos_list)
+            # print(poc_file_name_list)
+            for poc_file_name in poc_file_name_list:
+                if '__pycache__' in poc_file_dir:
+                    continue
+                # print(poc_file_name)
+                poc_name_path = poc_file_dir + "\\" + poc_file_name
+                poc_name_path = poc_name_path.replace("\\", "/")
+                # 判断是py文件在打开  文件存在
+                # print(poc_file_name[:8])
+                if os.path.isfile(poc_name_path) and (
+                        os.path.splitext(poc_name_path)[1] in ['.pyd', '.pyc', '.so', '.py']) and len(
+                        poc_file_name) >= 8 and poc_file_name[:8] == "Plugins_":
+                    single_plugins = {}
+                    single_plugins['cms_name'] = cms_name
+                    single_plugins['poc_file_name'] = poc_file_name
+                    single_plugins['poc_file_path'] = poc_name_path
+                    all_plugins.append(single_plugins)
+    return all_plugins
 #列出所有的漏洞
 def list_all_vuln():
     conn2 = sqlite3.connect(DB_NAME)
@@ -476,9 +515,9 @@ def check_vuln(url_list,poc_list,threadnum):
     for url in url_list:
         for all in poc_list:
             # print(all)
-            poc_filename = 'Plugins/' + all[1] + '/' + all[2]
+            poc_filename = './Plugins/' + all[1] + '/' + all[2]
             # print(filename)
-            poc_methods = 'Plugins.' + all[1]+ '.' + all[2][:-3]
+            poc_methods = all[2]
             portQueue.put(url+ '$$$' + poc_filename + '$$$' + poc_methods+'$$$'+all[1]+'$$$'+all[5]+'$$$'+all[6]+'$$$'+all[7])
             # print(url,methods[0])
     if threadnum>portQueue.qsize():
@@ -524,7 +563,7 @@ def exp_start(url_list,poc,timeout,exp_type,cmd):
         # print(url)
         print(Fore.CYAN+("[*]URL:%s"%url))
         poc_filename = "Plugins/"+poc[1]+"/"+poc[2]
-        poc_methods = "Plugins."+poc[1]+"."+poc[2][:-3]
+        poc_methods = poc[2]
         return_data =  {"type":'Result', "value":"root", "color":"black"}
         eventlet.monkey_patch(time=True)
         try:
@@ -545,12 +584,72 @@ def exp_start(url_list,poc,timeout,exp_type,cmd):
                     data['type'] = 'shell'
                     data['reverse_ip'] = ip
                     data['reverse_port'] = port
-                    nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+
+                    if os.path.isfile(poc_filename + '.py'):
+                        poc_filename = poc_filename + '.py'
+                        nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+                    elif os.path.isfile(poc_filename + '.pyc'):
+                        poc_filename = poc_filename + '.pyc'
+                        module_spec = importlib.util.spec_from_file_location(poc_methods,
+                                                                             poc_filename)
+                        nnnnnnnnnnnn1 = importlib.util.module_from_spec(module_spec)
+                        module_spec.loader.exec_module(nnnnnnnnnnnn1)
+                    else:
+                        sysstr = platform.system()
+                        if (sysstr == "Windows"):
+                            poc_filename = poc_filename + '.pyd'
+                        elif (sysstr == "Linux"):
+                            poc_filename = poc_filename + '.so'
+                        loader_details = (
+                            importlib.machinery.ExtensionFileLoader,
+                            importlib.machinery.EXTENSION_SUFFIXES
+                        )
+                        tools_finder = importlib.machinery.FileFinder(
+                            os.path.dirname(poc_filename), loader_details)
+                        # print("FileFinder: ", tools_finder)
+                        toolbox_specs = tools_finder.find_spec(poc_methods)
+                        # print("find_spec: ", toolbox_specs)
+                        nnnnnnnnnnnn1 = importlib.util.module_from_spec(toolbox_specs)
+                        # print("module: ", nnnnnnnnnnnn1)
+                        toolbox_specs.loader.exec_module(nnnnnnnnnnnn1)
+                        # print("导入成功 path_import(): ", nnnnnnnnnnnn1)
+                    
+                    
+                    
+                    # nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
                     result = nnnnnnnnnnnn1.do_exp(url, "", '','',{}, data)
                 else:
                     data['type'] = 'cmd'
                     data['command'] = cmd
-                    nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+                    if os.path.isfile(poc_filename + '.py'):
+                        poc_filename = poc_filename + '.py'
+                        nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+                    elif os.path.isfile(poc_filename + '.pyc'):
+                        poc_filename = poc_filename + '.pyc'
+                        module_spec = importlib.util.spec_from_file_location(poc_methods,
+                                                                             poc_filename)
+                        nnnnnnnnnnnn1 = importlib.util.module_from_spec(module_spec)
+                        module_spec.loader.exec_module(nnnnnnnnnnnn1)
+                    else:
+                        sysstr = platform.system()
+                        if (sysstr == "Windows"):
+                            poc_filename = poc_filename + '.pyd'
+                        elif (sysstr == "Linux"):
+                            poc_filename = poc_filename + '.so'
+                        loader_details = (
+                            importlib.machinery.ExtensionFileLoader,
+                            importlib.machinery.EXTENSION_SUFFIXES
+                        )
+                        tools_finder = importlib.machinery.FileFinder(
+                            os.path.dirname(poc_filename), loader_details)
+                        # print("FileFinder: ", tools_finder)
+                        toolbox_specs = tools_finder.find_spec(poc_methods)
+                        # print("find_spec: ", toolbox_specs)
+                        nnnnnnnnnnnn1 = importlib.util.module_from_spec(toolbox_specs)
+                        # print("module: ", nnnnnnnnnnnn1)
+                        toolbox_specs.loader.exec_module(nnnnnnnnnnnn1)
+                        # print("导入成功 path_import(): ", nnnnnnnnnnnn1)
+
                     result = nnnnnnnnnnnn1.do_exp(url, "", '','',{}, data)
 
                 if result.get('Result'):
@@ -576,6 +675,7 @@ def vuln_start(portQueue):
         url = all.split('$$$')[0]
         poc_filename= all.split('$$$')[1]
         poc_methods = all.split('$$$')[2]
+        print(poc_methods)
         poc_name = all.split('$$$')[3]
         poc_referer = all.split('$$$')[4]
         poc_description = all.split('$$$')[5]
@@ -592,8 +692,41 @@ def vuln_start(portQueue):
                 elif port is None:
                     port = 80
                 url = scheme + '://' + hostname + ':' + str(port) + '/'
-                nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+                # nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+
+                if os.path.isfile(poc_filename + '.py'):
+                    filename = poc_filename + '.py'
+
+
+                    nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, filename).load_module()
+                elif os.path.isfile(poc_filename + '.pyc'):
+                    filename = poc_filename + '.pyc'
+                    module_spec = importlib.util.spec_from_file_location(poc_methods,
+                                                                         filename)
+                    nnnnnnnnnnnn1 = importlib.util.module_from_spec(module_spec)
+                    module_spec.loader.exec_module(nnnnnnnnnnnn1)
+                else:
+                    sysstr = platform.system()
+                    if (sysstr == "Windows"):
+                        filename = poc_filename + '.pyd'
+                    elif (sysstr == "Linux"):
+                        filename = poc_filename + '.so'
+                    loader_details = (
+                        importlib.machinery.ExtensionFileLoader,
+                        importlib.machinery.EXTENSION_SUFFIXES
+                    )
+                    tools_finder = importlib.machinery.FileFinder(
+                        os.path.dirname(filename), loader_details)
+                    # print("FileFinder: ", tools_finder)
+                    toolbox_specs = tools_finder.find_spec(
+                        os.path.basename(os.path.splitext(filename)[0]))
+                    # print("find_spec: ", toolbox_specs)
+                    nnnnnnnnnnnn1 = importlib.util.module_from_spec(toolbox_specs)
+                    # print("module: ", nnnnnnnnnnnn1)
+                    toolbox_specs.loader.exec_module(nnnnnnnnnnnn1)
+                    # print("导入成功 path_import(): ", nnnnnnnnnnnn1)
                 result = nnnnnnnnnnnn1.do_poc(url,hostname,port,scheme,'')
+
                 # print(result)
                 if result.get('Result'):
                     # return_data.append(url)

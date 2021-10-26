@@ -1,5 +1,3 @@
-﻿# -*- coding: UTF-8 -*-
-#!/usr/bin/python
 import requests
 def vuln_info():
     info={
@@ -74,9 +72,9 @@ def do_exp(url,hostname,port,scheme,heads={},exp_data={}):
 
 
 
-if __name__== '__main__':
-    url='http://127.0.0.1/'
-    # aa= do_exp(url,'','','','',exp_data)
-    # print(aa)
-    aa = do_poc(args.url,'','','',heads={})
-    print(aa)
+# if __name__== '__main__':
+#     url='http://127.0.0.1/'
+#     # aa= do_exp(url,'','','','',exp_data)
+#     # print(aa)
+#     aa = do_poc(args.url,'','','',heads={})
+#     print(aa)
