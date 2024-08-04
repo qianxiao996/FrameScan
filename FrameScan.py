@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Author: qianxiao996
-# Blog:blog.qianxiao996.cn
+# Blog:blog.qianxiao996.com
 # date:  2019-9-21
 # 别问我为什么不用命令行解释模块，因为丑。
 import contextlib
 import datetime
 import importlib
 import platform
+from modules.Class_Poc import Class_Poc
 import sys, os
 sys.path.append('./Modules')
 sys.path.append('./Plugins/Modules')
 vuln_plugins_dir = './Plugins/Vuln_Plugins/'
+yaml_plugins_dir = './Plugins/Yaml_Plugins/'
 import time
 from urllib.parse import urlparse
 from colorama import init, Fore
@@ -20,7 +22,7 @@ import eventlet
 from prettytable import PrettyTable
 import sqlite3, requests, threading
 import queue, frozen_dir
-
+import yaml
 all_vuln_out_table = PrettyTable([Fore.CYAN + ('URL'),Fore.CYAN + ('漏洞名称'), Fore.CYAN + ('n漏洞编号'), Fore.CYAN + ('测试结果'),
                      Fore.CYAN + ("漏洞描述"), Fore.CYAN + ("漏洞来源"), Fore.CYAN + ("插件路径"),
                      Fore.CYAN + ("Payload")])
@@ -35,7 +37,7 @@ if (sysstr == "Windows"):
     houzhui = '.pyd'
 elif (sysstr == "Linux"):
     houzhui = '.so'
-plugins_ext = ['.py', '.pyc']
+plugins_ext = ['.py','yaml', '.pyc']
 plugins_ext.append(houzhui)
 SETUP_DIR = frozen_dir.app_path()
 sys.path.append(SETUP_DIR)
@@ -44,7 +46,7 @@ vuln_data = []
 # 禁用安全警告
 requests.packages.urllib3.disable_warnings()
 DB_NAME = "./VULN_DB.db"  # 存储的数据库名
-VERSION = "V1.6.7 20230412"
+VERSION = "V1.6.8 20230804"
 FLAGLET = ("""
         _____                         ____                  
         |  ___| __ __ _ _ __ ___   ___/ ___|  ___ __ _ _ __  
@@ -153,7 +155,7 @@ def getparameter():
 def Reload_POC():
     print(Fore.CYAN + (FLAGLET))
     # 删除数据库，重新建立
-    (out_info("正在删除数据库..."))
+    out_info("正在删除数据库...")
     try:
         if os.path.exists(DB_NAME):
             os.remove(DB_NAME)
@@ -180,71 +182,116 @@ def Reload_POC():
     # cms_path='Plugins/'
     try:
         id = 1
-        all_plugins = get_dir_file(vuln_plugins_dir)
-
-        go_load_plugins = []  # 存放已经加载的模块
-        for poc in all_plugins:
-            try:
-                if os.path.splitext(poc['poc_file_name'])[-1] in plugins_ext:
-                    if os.path.splitext(poc['poc_file_name'])[-1] == '.py':
-                        nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(os.path.splitext(poc['poc_file_name'])[0],
-                                                                             poc['poc_file_path']).load_module()
-                    elif os.path.splitext(poc['poc_file_name'])[-1] in ['.pyc', '.pyd', '.so']:
-                        if os.path.splitext(poc['poc_file_name'])[0] in go_load_plugins:
-                            continue
-                        module_spec = importlib.util.spec_from_file_location(os.path.splitext(poc['poc_file_name'])[0],
-                                                                             poc['poc_file_path'])
-                        nnnnnnnnnnnn1 = importlib.util.module_from_spec(module_spec)
-                        module_spec.loader.exec_module(nnnnnnnnnnnn1)
-                    vuln_info = nnnnnnnnnnnn1.vuln_info()
-                    if vuln_info.get('vuln_class'):
-                        vuln_class = vuln_info.get('vuln_class')
-                    else:
-                        vuln_class = '未分类'
-                    if vuln_info.get('FofaQuery_type'):
-                        FofaQuery_type = vuln_info.get('FofaQuery_type')
-                    else:
-                        FofaQuery_type = 'http'
-                    if vuln_info.get('FofaQuery_link'):
-                        FofaQuery_link = (vuln_info.get('FofaQuery_link'))
-                    else:
-                        FofaQuery_link = '/'
-
-                    if vuln_info.get('FofaQuery_rule'):
-                        FofaQuery_rule = vuln_info.get('FofaQuery_rule')
-                    else:
-                        FofaQuery_rule = ''
-                    insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-
-                    # 将数据插入到表中
-                    cursor.execute(insert_sql, (
-                        id, poc['cms_name'], os.path.splitext(poc['poc_file_name'])[0], vuln_info['vuln_name'],
-                        vuln_info['vuln_author'],
-                        vuln_info['vuln_referer'], vuln_info['vuln_description'],
-                        vuln_info['vuln_identifier'], vuln_info['vuln_solution'], vuln_info['ispoc'],
-                        vuln_info['isexp'], vuln_class, FofaQuery_type, FofaQuery_link, FofaQuery_rule))
-                    id = id + 1
-                    go_load_plugins.append(os.path.splitext(poc['poc_file_name'])[0])
-            except Exception as  e:
-                print(Fore.RED + "%s脚本执行错误！\n[Exception]:\n%s</a>" % (poc['poc_file_name'], str(e)))
-                continue
-            conn.commit()  # 提交
-
+        id,all_poc = Reload_POC_Python(id)
+        id,all_yaml_poc = Reload_POC_Yaml(id)
+        all_poc += all_yaml_poc
+        insert_sql = 'insert into vuln_poc  (id,cms_name,vuln_file,vuln_name,vuln_author,vuln_referer,vuln_description,vuln_identifier,vuln_solution,ispoc,isexp,vuln_class,FofaQuery_type,FofaQuery_link,FofaQuery_rule) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        for i in all_poc:
+            # 将数据插入到表中
+            cursor.execute(insert_sql,i)
+        conn.commit()  # 提交
+        cursor.execute("select count(*) from vuln_poc")
+        all_num = cursor.fetchall()
         # print(result)
         cursor.execute("select count(ispoc) from vuln_poc where ispoc =1")
         poc_num = cursor.fetchall()
         cursor.execute("select count(isexp) from vuln_poc where isexp =1")
         exp_num = cursor.fetchall()
         conn.close()
-        out_success("数据更新完成！\n"+Fore.YELLOW +"  POC数量：%s\tEXP数量：%s" % (poc_num[0][0], exp_num[0][0]))
+        out_success("数据更新完成！\n"+Fore.YELLOW +"插件总数:%s  POC数量：%s\tEXP数量：%s" % (all_num[0][0],poc_num[0][0], exp_num[0][0]))
         sys.exit(1)
         # reboot = sys.executable
         # os.execl(reboot, reboot, *sys.argv)
     except Exception as e:
         print(Fore.RED + ("Error:数据写入失败！\n[Exception]:\n%s</p>" % (e)))
         sys.exit(1)
+def Reload_POC_Yaml(id):
+    all_plugins = []
+    plugins_path = yaml_plugins_dir.replace("\\", "/")
+    for root, dirs, files in os.walk(plugins_path):
+        for poc_file_name in files:
+            poc_name_path = root + "\\" + poc_file_name
+            poc_name_path = poc_name_path.replace("\\", "/")
+            # 判断是py文件在打开  文件存在
+            # print(poc_file_name[:8])
+            if poc_file_name.startswith("poc-yaml") and poc_file_name.endswith(".yaml"):
+                try:
+                    f= open(poc_name_path, 'r', encoding='utf-8')
+                    data = yaml.load(stream=f, Loader=yaml.FullLoader)
+                    f.close()
+                    cms_name   = data.get("detail").get("category")
+                    if  data.get("detail").get("name"):
+                        vuln_name = data.get("detail").get("name")
+                    else:
+                        vuln_name =  data.get("name") 
+                    poc_file_path = poc_file_name
+                                    # 将数据插入到表中
+                    id+=1
+                    vuln_class = data.get("detail").get("category")
+                    vuln_author = data.get("detail").get("author")
+                    vuln_referer = str(data.get("detail").get("links"))
+                    vuln_description = str(data.get("detail").get("description"))
+                    vuln_identifier = str(data.get("detail").get("identifier"))
+                    vuln_solution = str(data.get("detail").get("solution"))
+                    single_data = [
+                        id, cms_name, poc_file_path , vuln_name,vuln_author,vuln_referer, vuln_description,
+                        vuln_identifier, vuln_solution, True,
+                        False, vuln_class, "", "", ""]
+                    all_plugins.append(single_data)
+                except Exception as e:
+                    print(Fore.RED + ("Error:插件执行错误\n[Exception]:\n%s</p>" % (e)))
+                    continue
+    return id,all_plugins
 
+def Reload_POC_Python(id):
+    all_plugins = get_dir_file(vuln_plugins_dir)
+    go_load_plugins = []  # 存放已经加载的模块
+    for poc in all_plugins:
+        try:
+            if os.path.splitext(poc['poc_file_name'])[-1] in plugins_ext:
+                if os.path.splitext(poc['poc_file_name'])[-1] == '.py':
+                    nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(os.path.splitext(poc['poc_file_name'])[0],
+                                                                            poc['poc_file_path']).load_module()
+                elif os.path.splitext(poc['poc_file_name'])[-1] in ['.pyc', '.pyd', '.so']:
+                    if os.path.splitext(poc['poc_file_name'])[0] in go_load_plugins:
+                        continue
+                    module_spec = importlib.util.spec_from_file_location(os.path.splitext(poc['poc_file_name'])[0],
+                                                                            poc['poc_file_path'])
+                    nnnnnnnnnnnn1 = importlib.util.module_from_spec(module_spec)
+                    module_spec.loader.exec_module(nnnnnnnnnnnn1)
+                vuln_info = nnnnnnnnnnnn1.vuln_info()
+                if vuln_info.get('vuln_class'):
+                    vuln_class = vuln_info.get('vuln_class')
+                else:
+                    vuln_class = '未分类'
+                if vuln_info.get('FofaQuery_type'):
+                    FofaQuery_type = vuln_info.get('FofaQuery_type')
+                else:
+                    FofaQuery_type = 'http'
+                if vuln_info.get('FofaQuery_link'):
+                    FofaQuery_link = (vuln_info.get('FofaQuery_link'))
+                else:
+                    FofaQuery_link = '/'
 
+                if vuln_info.get('FofaQuery_rule'):
+                    FofaQuery_rule = vuln_info.get('FofaQuery_rule')
+                else:
+                    FofaQuery_rule = ''
+
+                # 将数据插入到表中
+                single_data = [
+                    id, poc['cms_name'], os.path.splitext(poc['poc_file_name'])[0], vuln_info['vuln_name'],
+                    vuln_info['vuln_author'],
+                    vuln_info['vuln_referer'], vuln_info['vuln_description'],
+                    vuln_info['vuln_identifier'], vuln_info['vuln_solution'], vuln_info['ispoc'],
+                    vuln_info['isexp'], vuln_class, FofaQuery_type, FofaQuery_link, FofaQuery_rule]
+                id = id + 1
+                go_load_plugins.append(single_data)
+        except Exception as e:
+            print(Fore.RED + ("Error:插件执行错误\n[Exception]:\n%s</p>" % (e)))
+            continue
+    return id,go_load_plugins
+    
 def get_dir_file(dir):
     all_plugins = []
     plugins_path = dir
@@ -331,7 +378,6 @@ def list_cms_vuln():
                 table.add_row(list(single))
             print(table)
             conn2.close()
-
     else:
         print(Fore.CYAN + (FLAGLET))
 
@@ -358,21 +404,6 @@ def sql_search(sql, type='list'):
     values = cursor.fetchall()
     return values
 
-
-# sql查询返回字典
-
-# # sql查询通用函数
-# def check_sql(sql):
-#     conn = sqlite3.connect(DB_NAME)
-#     # 创建一个游标 curson
-#     cursor = conn.cursor()
-#     # 执行一条语句,创建 user表 如不存在创建
-#     cursor.execute(sql)
-#     values = cursor.fetchall()
-#
-#     return values
-
-
 def check_vuln(url_list, poc_list, threadnum):
     # print(save_file,threadnum)
     # print(save_file)
@@ -381,8 +412,7 @@ def check_vuln(url_list, poc_list, threadnum):
 
     if savefiletype == 'html':
         save = open(savefilename, 'w', encoding='gbk')
-        save.write('''
-        
+        save.write('''   
 <html>
 <head>
     <title>FrameScan Sacn Result</title>
@@ -455,7 +485,6 @@ def check_vuln(url_list, poc_list, threadnum):
 </body>
 </html>
 <script>
-
     $("#table").dataTable({
          //lengthMenu: [5, 10, 20, 30],//这里也可以设置分页，但是不能设置具体内容，只能是一维或二维数组的方式，所以推荐下面language里面的写法。
         destroy:true,
@@ -532,11 +561,8 @@ def check_vuln(url_list, poc_list, threadnum):
                 exclude_links: true,
                 exclude_inputs: true
             });
-        }
-
-        
-</script>
-        ''')
+        }  
+</script>''')
         save.close()
 
     print(Fore.CYAN + (FLAGLET))
@@ -546,8 +572,11 @@ def check_vuln(url_list, poc_list, threadnum):
     (out_info("正在创建队列..."))
     for url in url_list:
         for all in poc_list:
-            poc_filename = vuln_plugins_dir + all['cms_name'] + '/' +all['vuln_file']
-            # print(filename)
+            if all['vuln_file'].startswith("poc-yaml") and all['vuln_file'].endswith(".yaml"):
+                poc_filename = yaml_plugins_dir + all['vuln_file']
+            else:
+                poc_filename = vuln_plugins_dir + all['cms_name'] + '/' +all['vuln_file']
+                # print(filename)
             portQueue.put(
                 url + '$$$' + poc_filename + '$$$' + all['vuln_file'] + '$$$' + all['vuln_name'] + '$$$' + all['vuln_referer'] + '$$$' + all['vuln_description']+ '$$$' + all['vuln_identifier'])
     if threadnum > portQueue.qsize():
@@ -705,6 +734,72 @@ def exp_start(url_list, poc, timeout, exp_type, cmd):
     return
 
 
+def vuln_scan_python(url,poc_filename,poc_methods,poc_name,poc_referer,poc_description,poc_bianhao):
+    eventlet.monkey_patch(time=True)
+    with eventlet.Timeout(int(timeout), False):
+        try:
+            _url = urlparse(url)
+            hostname = _url.hostname
+            port = _url.port
+            scheme = _url.scheme
+            if port is None and scheme == 'https':
+                port = 443
+            elif port is None:
+                port = 80
+            url = scheme + '://' + hostname + ':' + str(port) + '/'
+            # nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
+            nnnnnnnnnnnn1 = get_obj_by_path(poc_filename)
+            if not nnnnnnnnnnnn1:
+                out_error(("%s文件导入失败!" % (poc_filename)))
+                return
+            result = nnnnnnnnnnnn1.do_poc(url, hostname, port, scheme, '')
+            if result:
+                if result.get('Result'):
+                    # return_data.append(url)
+                    vuln_info = [url.strip(), poc_name, poc_bianhao, "存在", poc_description.strip(), poc_referer.strip(),poc_filename, result.get("Result_Info")]
+                    vuln_data.append(vuln_info)
+                    output([url.strip(), poc_name, "存在", poc_description.strip(), poc_referer.strip(), poc_filename,
+                            result.get("Result_Info"), poc_bianhao.strip()])
+                    if poc_bianhao:
+                        out_success("%s\t%s(%s)\t%s\t%s。" % (
+                            url, poc_name, poc_bianhao, "存在", result.get("Result_Info")))
+                    else:
+                        out_success(
+                            "%s\t%s\t%s\t%s。" % (url, poc_name, "存在", result.get("Result_Info")))
+                    # 不存在
+                elif result.get('Error_Info'):
+                    out_error((
+                        "%s\t%s\t%s。" % (url, poc_name, result.get("Error_Info"))))
+                else:
+                    (out_info(
+                            "%s\t%s\t%s。" % (url, poc_name, "不存在")))
+
+            else:
+                out_error((
+                        "%s\t%s\t%s。" % (url, poc_name, "脚本返回结果信息为空！")))
+            return
+        except Exception as e:
+            # print(str(e))
+            out_error(("%s脚本执行错误!" % (poc_filename)))
+            out_error(("%s %s行" % (e, str(e.__traceback__.tb_lineno))))
+            return
+    out_error(("%s脚本运行超时!" % (poc_filename)))
+def vuln_scan_yaml(url,poc_filename,poc_methods,poc_name,poc_referer,poc_description,poc_bianhao):
+    eventlet.monkey_patch(thread=False, time=True)
+    with eventlet.Timeout(int(timeout), False):
+        try:
+            f=open(poc_filename,"r",encoding="utf-8")
+            poc = yaml.load(f,Loader=yaml.FullLoader)
+            f.close()
+            poc_obj  = Class_Poc(url,poc,timeout,False)
+            result = poc_obj.main()
+            if result.get("result"):
+                out_success("%s %s %s %s %s"%(result.get("url"),poc_name,poc_methods,result.get("result"),result.get("others")))
+            else:
+                out_info("%s %s %s %s %s"%(result.get("url"),poc_name ,poc_methods,result.get("result"),result.get("others")))
+        except Exception as e:
+            out_error(("%s\t%s\t%s。%s" % (url, poc_name, "脚本执行错误",str(e))))
+            return
 def vuln_start(portQueue):
     while 1:
         if portQueue.empty():  # 队列空就结束
@@ -720,55 +815,14 @@ def vuln_start(portQueue):
         poc_referer = all.split('$$$')[4]
         poc_description = all.split('$$$')[5]
         poc_bianhao = all.split('$$$')[6]
-        eventlet.monkey_patch(time=True)
-        with eventlet.Timeout(int(timeout), False):
-            try:
-                _url = urlparse(url)
-                hostname = _url.hostname
-                port = _url.port
-                scheme = _url.scheme
-                if port is None and scheme == 'https':
-                    port = 443
-                elif port is None:
-                    port = 80
-                url = scheme + '://' + hostname + ':' + str(port) + '/'
-                # nnnnnnnnnnnn1 = importlib.machinery.SourceFileLoader(poc_methods, poc_filename).load_module()
-                nnnnnnnnnnnn1 = get_obj_by_path(poc_filename)
-                if not nnnnnnnnnnnn1:
-                    out_error(("%s文件导入失败!" % (poc_filename)))
-                    continue
-                result = nnnnnnnnnnnn1.do_poc(url, hostname, port, scheme, '')
-                if result:
-                    if result.get('Result'):
-                        # return_data.append(url)
-                        vuln_info = [url.strip(), poc_name, poc_bianhao, "存在", poc_description.strip(), poc_referer.strip(),poc_filename, result.get("Result_Info")]
-                        vuln_data.append(vuln_info)
-                        output([url.strip(), poc_name, "存在", poc_description.strip(), poc_referer.strip(), poc_filename,
-                                result.get("Result_Info"), poc_bianhao.strip()])
-                        if poc_bianhao:
-                            out_success("%s\t%s(%s)\t%s\t%s。" % (
-                                url, poc_name, poc_bianhao, "存在", result.get("Result_Info")))
-                        else:
-                            out_success(
-                                "%s\t%s\t%s\t%s。" % (url, poc_name, "存在", result.get("Result_Info")))
-                        # 不存在
-                    elif result.get('Error_Info'):
-                        out_error((
-                            "%s\t%s\t%s。" % (url, poc_name, result.get("Error_Info"))))
-                    else:
-                        (out_info(
-                                "%s\t%s\t%s。" % (url, poc_name, "不存在")))
+        if poc_methods.startswith("poc-yaml") and poc_methods.endswith(".yaml"):
+            vuln_scan_yaml(url,poc_filename,poc_methods,poc_name,poc_referer,poc_description,poc_bianhao)
+        else:
+            vuln_scan_python(url,poc_filename,poc_methods,poc_name,poc_referer,poc_description,poc_bianhao)
 
-                else:
-                    out_error((
-                            "%s\t%s\t%s。" % (url, poc_name, "脚本返回结果信息为空！")))
-                continue
-            except Exception as e:
-                # print(str(e))
-                out_error(("%s脚本执行错误!" % (poc_filename)))
-                out_error(("%s %s行" % (e, str(e.__traceback__.tb_lineno))))
-                continue
-        out_error(("%s脚本运行超时!" % (poc_filename)))
+
+
+        
 
 def get_obj_by_path(filename):
     if os.path.isfile(filename + '.py'):
