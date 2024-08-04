@@ -80,15 +80,10 @@ FrameScan是一款python3编写的简易的cms漏洞检测利用框架，支持�
 git clone https://github.com/qianxiao996/FrameScan
 ```
 
-安装依赖（不需要！）
+安装依赖
 
 ```
-脚本主要依赖于以下模块
-import importlib
-import sys,os,re
-prettytable
-import sqlite3,requests,threading
-import queue
+python3 -m pip install requirements.txt
 ```
 
 单URL批量检测
@@ -151,6 +146,8 @@ python3 FrameScan.py -f 文件  -m exp -v exp_name -shell
 ```
 
 ## 插件模板
+
+### python插件
 
 插件命名格式为Plugins_插件名.py。请规范编写。脚本中为示例代码。插件模板与GUI统一，可以相互调用。
 
@@ -240,9 +237,9 @@ if __name__== '__main__':
 
 ```
 
-欢迎投递POC
+### Yaml插件
 
-邮箱地址：qianxiao996@126.com
+请参考[FrameScan-Yaml插件文档](https://github.com/qianxiao996/FrameScan-Yaml/)
 
 ## 警告！
 **请勿用于非法用途！否则自行承担一切后果**
