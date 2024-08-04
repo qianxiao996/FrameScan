@@ -22,7 +22,7 @@ sqlparse==0.5.1
 tqdm==4.66.5
 typing_extensions==4.7.1
 tzdata==2024.1
-urllib3==2.0.7
+urllib3==2.2.2
 wcwidth==0.2.10
 wifi-password==1.1.1
 wincertstore==0.2
