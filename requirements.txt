@@ -15,7 +15,7 @@ pillow==10.4.0
 prettytable==3.7.0
 PyYAML==6.0.1
 qrcode==7.3.1
-requests==2.31.0
+requests==2.32.2
 six==1.16.0
 some-package==0.1
 sqlparse==0.5.1
