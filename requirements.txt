@@ -2,7 +2,7 @@ asgiref==3.8.1
 certifi==2024.7.4
 charset-normalizer==3.3.2
 colorama==0.4.6
-Django==5.0.7
+Django==5.0.8
 dnspython==2.3.0
 eventlet==0.33.3
 greenlet==3.0.1
